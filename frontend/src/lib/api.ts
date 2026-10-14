@@ -600,18 +600,31 @@ export interface LocalModelInfo {
   parameter_size: string;
 }
 
+export interface LoadedModelInfo {
+  name: string;
+  model: string;
+  size_vram_mb: number;
+  size_mb: number;
+  expires_at: string;
+}
+
 export interface LocalModelsStatus {
   ollama_online: boolean;
   default_model: string;
   active_engine: string;
   total_local_models: number;
   installed_models: LocalModelInfo[];
+  loaded_in_memory?: LoadedModelInfo[];
+  is_model_warm?: boolean;
   recommended_for_legal_counter_agent: string;
 }
 
 export interface BotTurnResponse {
   response_text: string;
   model_used: string;
+  actual_engine?: string;
+  fallback_used?: boolean;
+  engine_label?: string;
   latency_ms: number;
   detected_dark_patterns: string[];
   statutory_citations: string[];

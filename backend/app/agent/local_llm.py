@@ -57,6 +57,65 @@ def get_available_local_models(timeout: float = 2.5) -> List[Dict[str, Any]]:
         return []
 
 
+def get_loaded_models(timeout: float = 2.0) -> List[Dict[str, Any]]:
+    """Retrieve list of currently loaded/running models in Ollama memory/VRAM."""
+    try:
+        req = urllib.request.Request(f"{OLLAMA_BASE_URL}/api/ps")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+            loaded = []
+            for m in data.get("models", []):
+                loaded.append({
+                    "name": m.get("name"),
+                    "model": m.get("model"),
+                    "size_vram_mb": round(m.get("size_vram", 0) / (1024 * 1024), 1),
+                    "size_mb": round(m.get("size", 0) / (1024 * 1024), 1),
+                    "expires_at": m.get("expires_at"),
+                })
+            return loaded
+    except Exception:
+        return []
+
+
+def warmup_local_model(model: str = DEFAULT_LOCAL_MODEL) -> bool:
+    """Pre-warm the local Ollama model in RAM/VRAM with keep_alive=24h to avoid cold start latency."""
+    try:
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "ping"}],
+            "stream": False,
+            "keep_alive": "24h",
+            "options": {"num_predict": 1},
+        }
+        req = urllib.request.Request(
+            f"{OLLAMA_BASE_URL}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=60.0) as resp:
+            if resp.status == 200:
+                logger.info(f"Ollama model {model} successfully pre-warmed and pinned with keep_alive=24h")
+                return True
+    except Exception as e:
+        logger.warning(f"Ollama warm-up for {model} encountered: {e}")
+    return False
+
+
+def start_background_warmup():
+    """Start model pre-warming in a daemon thread so startup is completely non-blocking."""
+    import threading
+    t = threading.Thread(target=warmup_local_model, daemon=True)
+    t.start()
+
+
+# Initiate background warm-up immediately on module load
+try:
+    if check_ollama_available(timeout=0.5):
+        start_background_warmup()
+except Exception:
+    pass
+
+
 def clean_llm_response(text: str) -> str:
     """Clean model output, removing reasoning/thinking tokens (e.g. DeepSeek-R1 <think> tags)."""
     if not text:
@@ -73,9 +132,9 @@ def generate_local_chat_completion(
     user_prompt: str,
     model: str = DEFAULT_LOCAL_MODEL,
     temperature: float = 0.1,
-    timeout: float = 20.0,
+    timeout: float = 50.0,
 ) -> Optional[str]:
-    """Execute local chat completion via Ollama HTTP API with Delimiter Sandboxing."""
+    """Execute local chat completion via Ollama HTTP API with Delimiter Sandboxing and keep_alive=24h."""
     payload = {
         "model": model,
         "messages": [
@@ -83,6 +142,7 @@ def generate_local_chat_completion(
             {"role": "user", "content": user_prompt},
         ],
         "stream": False,
+        "keep_alive": "24h",
         "options": {
             "temperature": temperature,
             "top_p": 0.9,
@@ -109,11 +169,16 @@ def generate_local_chat_completion(
     return None
 
 
-def generate_adversarial_counter_response(state: Dict[str, Any], model: Optional[str] = None) -> str:
+def generate_adversarial_counter_response(
+    state: Dict[str, Any],
+    model: Optional[str] = None,
+    return_meta: bool = False,
+) -> Any:
     """Generate legally grounded, adversarial consumer counter-response using local AI.
     
     Uses local model (defaults to llama3.2:latest) with prompt insulation tags (<untrusted_merchant_message>)
     and falls back to deterministic statutory rules if Ollama is unreachable.
+    If return_meta=True, returns (response_text, fallback_used, actual_model_or_engine).
     """
     chosen_model = model or DEFAULT_LOCAL_MODEL
     merchant = state.get("merchant_name", "Merchant")
@@ -165,18 +230,18 @@ def generate_adversarial_counter_response(state: Dict[str, Any], model: Optional
         f"Task: Write a firm counter-response to the merchant rejecting their stalling or refusal and demanding full resolution."
     )
 
-    # 1. Attempt generation with chosen local model
+    # 1. Attempt generation with chosen local model (timeout=50.0 to allow cold start load)
     local_output = generate_local_chat_completion(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
         model=chosen_model,
         temperature=0.1,
-        timeout=18.0,
+        timeout=50.0,
     )
 
     if local_output:
         logger.info(f"Generated counter-response using local model {chosen_model}")
-        return local_output
+        return (local_output, False, chosen_model) if return_meta else local_output
 
     # 2. Try secondary local model if default was unavailable
     for alt_model in FALLBACK_LOCAL_MODELS:
@@ -187,35 +252,37 @@ def generate_adversarial_counter_response(state: Dict[str, Any], model: Optional
             user_prompt=user_prompt,
             model=alt_model,
             temperature=0.1,
-            timeout=18.0,
+            timeout=50.0,
         )
         if local_output:
             logger.info(f"Generated counter-response using local fallback model {alt_model}")
-            return local_output
+            return (local_output, False, alt_model) if return_meta else local_output
         break  # Only try one fallback to keep latency reasonable
 
     # 3. Deterministic Statutory Rule Fallback (zero latency, always reliable)
     logger.info("Using deterministic statutory fallback for counter-response")
     if offer is not None and offer > 0:
         if offer >= floor:
-            return (
+            fallback_text = (
                 f"We note your proposed settlement offer of ₹{offer:,.2f}. The offer has been placed before the consumer "
                 f"for formal sign-off. Please confirm that upon acceptance, the recurring e-mandate linked to this account "
                 f"will be immediately revoked and written confirmation provided within 24 hours under the {statutes_str}."
             )
         else:
-            return (
+            fallback_text = (
                 f"The partial offer of ₹{offer:,.2f} is unacceptable as it fails to satisfy the statutory restitution floor "
                 f"(₹{floor:,.2f}) for the unauthorized charge of ₹{req_amt:,.2f}. Under {statutes_str}, continuing to withhold "
                 f"full restitution constitutes a continuing unfair trade practice. We demand immediate reversal of ₹{floor:,.2f} minimum "
                 f"to avert formal escalation to the Level 2 Grievance Redressal Officer."
             )
     else:
-        return (
+        fallback_text = (
             f"Regarding the disputed transaction of ₹{req_amt:,.2f} with {merchant}: under the {statutes_str}, "
             f"unilateral billing without accessible cancellation violates statutory consumer rights. "
             f"We demand full refund of ₹{req_amt:,.2f} to the original payment source and written confirmation of e-mandate cancellation."
         )
+
+    return (fallback_text, True, "statutory_rule_engine") if return_meta else fallback_text
 
 
 def generate_bot_dispute_turn(
@@ -273,7 +340,9 @@ def generate_bot_dispute_turn(
         "messages": [{"sender": "merchant", "content": merchant_message}],
     }
 
-    response_text = generate_adversarial_counter_response(state, model=model)
+    response_text, fallback_used, actual_engine = generate_adversarial_counter_response(
+        state, model=model, return_meta=True
+    )
     latency_ms = round((time.time() - t0) * 1000)
 
     # 5. Determine recommended next action
@@ -289,7 +358,10 @@ def generate_bot_dispute_turn(
 
     return {
         "response_text": response_text,
-        "model_used": model,
+        "model_used": actual_engine if not fallback_used else model,
+        "actual_engine": actual_engine,
+        "fallback_used": fallback_used,
+        "engine_label": f"Local AI ({actual_engine})" if not fallback_used else "Statutory Rule Engine (Fallback)",
         "latency_ms": latency_ms,
         "detected_dark_patterns": detected_patterns,
         "statutory_citations": statutes,
@@ -298,5 +370,5 @@ def generate_bot_dispute_turn(
         "detected_offer_inr": latest_offer_inr,
         "recommended_next_action": next_action,
         "strategic_advice": advice,
-        "is_local_ai": True,
+        "is_local_ai": not fallback_used,
     }

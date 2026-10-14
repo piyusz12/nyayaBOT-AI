@@ -348,7 +348,9 @@ export default function LiveNegotiationConsole() {
     const newAgentMsg: NegotiationMessage = {
       id: `agent-${Date.now()}`,
       sender: 'agent',
-      sender_label: `NyayaBot AI (${botTurnResult.model_used})`,
+      sender_label: botTurnResult.fallback_used
+        ? 'NyayaBot (Statutory Engine)'
+        : `NyayaBot AI (${botTurnResult.model_used})`,
       content: botTurnResult.response_text,
       timestamp: new Date().toISOString(),
     };
@@ -969,11 +971,26 @@ export default function LiveNegotiationConsole() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="badge badge-active" style={{ fontSize: 11 }}>
-                    ⚡ {botTurnResult.model_used}
-                  </span>
+                  {botTurnResult.fallback_used ? (
+                    <span
+                      className="badge"
+                      style={{
+                        fontSize: 11,
+                        background: 'rgba(234, 179, 8, 0.15)',
+                        color: '#facc15',
+                        border: '1px solid rgba(234, 179, 8, 0.3)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      ⚠️ Statutory Rule Fallback
+                    </span>
+                  ) : (
+                    <span className="badge badge-active" style={{ fontSize: 11, fontWeight: 600 }}>
+                      ⚡ {botTurnResult.model_used}
+                    </span>
+                  )}
                   <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    Generated in {botTurnResult.latency_ms}ms (Offline Local AI)
+                    Generated in {botTurnResult.latency_ms}ms ({botTurnResult.fallback_used ? 'Deterministic Rules Engine' : 'Offline Local AI'})
                   </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
