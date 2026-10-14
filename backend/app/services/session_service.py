@@ -15,6 +15,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Dict, List, Optional
+from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.agent.graph import negotiation_graph
@@ -108,7 +109,11 @@ def persist_checkpoint(
         db.rollback()
 
 
-async def generate_sse_events(session_id: str, db: Session) -> AsyncGenerator[str, None]:
+async def generate_sse_events(
+    session_id: str,
+    db: Session,
+    request: Optional[Request] = None,
+) -> AsyncGenerator[str, None]:
     """Generate Server-Sent Events (SSE) representing real-time LangGraph multi-agent orchestration."""
     session = ACTIVE_SESSIONS.get(session_id)
     if not session:
@@ -117,6 +122,36 @@ async def generate_sse_events(session_id: str, db: Session) -> AsyncGenerator[st
     # 1. Connection established event
     yield f"event: connected\ndata: {json.dumps({'session_id': session_id, 'status': session['status'], 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
     await asyncio.sleep(0.4)
+
+    if session.get("stream_played"):
+        # Replay current transcript to reconnecting client without duplicate insertions
+        for msg in session.get("messages", []):
+            yield f"event: transcript_message\ndata: {json.dumps(msg)}\n\n"
+            await asyncio.sleep(0.05)
+
+        if session.get("status") == "AWAITING_HITL" and session.get("pending_hitl"):
+            event_hitl_node = {
+                "type": "agent_node_transition",
+                "node": "human_approval_gate",
+                "title": "Human Approval Gate (HITL)",
+                "status": "AWAITING_HITL",
+                "description": "Session awaiting supervisor sign-off.",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            yield f"event: node_transition\ndata: {json.dumps(event_hitl_node)}\n\n"
+            yield f"event: hitl_required\ndata: {json.dumps(session['pending_hitl'])}\n\n"
+
+        # Maintain connection with keepalive pings until terminal, state transition, or client disconnect
+        while session.get("status") == "AWAITING_HITL":
+            if request and await request.is_disconnected():
+                break
+            yield ": keepalive\n\n"
+            await asyncio.sleep(3.0)
+
+        if session.get("status") in {"RESOLVED", "ESCALATE_EXTERNAL", "KILLED"}:
+            term_event = "session_resolved" if session.get("status") == "RESOLVED" else "session_escalated"
+            yield f"event: {term_event}\ndata: {json.dumps({'session_id': session_id, 'status': session['status'], 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
+        return
 
     # 2. Node 1: Triage and Loop Detection
     session["current_node"] = "triage_loop_detector"
@@ -224,6 +259,7 @@ async def generate_sse_events(session_id: str, db: Session) -> AsyncGenerator[st
             f"of the e-mandate on file. Please confirm acceptance."
         ),
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "simulated": True,
     }
     session["messages"].append(msg3)
     yield f"event: transcript_message\ndata: {json.dumps(msg3)}\n\n"
@@ -244,8 +280,10 @@ async def generate_sse_events(session_id: str, db: Session) -> AsyncGenerator[st
         "active_statutes": session["active_statutes"],
         "prompt": f"Merchant has offered a settlement of INR {offer_amt:,.2f} (85% restitution). Accept offer or escalate to statutory officer?",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "simulated": True,
     }
     session["pending_hitl"] = hitl_data
+    session["stream_played"] = True
 
     # Persist checkpoint at HITL gate
     persist_checkpoint(db, session["case_id"], session_id, session, step_index=5.0)
@@ -260,3 +298,15 @@ async def generate_sse_events(session_id: str, db: Session) -> AsyncGenerator[st
     }
     yield f"event: node_transition\ndata: {json.dumps(event_hitl_node)}\n\n"
     yield f"event: hitl_required\ndata: {json.dumps(hitl_data)}\n\n"
+
+    # Maintain connection with keepalive pings while awaiting supervisor approval or client disconnect
+    while session.get("status") == "AWAITING_HITL":
+        if request and await request.is_disconnected():
+            break
+        yield ": keepalive\n\n"
+        await asyncio.sleep(3.0)
+
+    if session.get("status") in {"RESOLVED", "ESCALATE_EXTERNAL", "KILLED"}:
+        term_event = "session_resolved" if session.get("status") == "RESOLVED" else "session_escalated"
+        yield f"event: {term_event}\ndata: {json.dumps({'session_id': session_id, 'status': session['status'], 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
+

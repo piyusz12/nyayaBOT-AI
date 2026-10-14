@@ -14,12 +14,13 @@ import {
   Settings,
   PlusCircle,
   CheckSquare,
+  type LucideIcon,
 } from 'lucide-react';
 
 interface NavItem {
   href: string;
   label: string;
-  icon: any;
+  icon: LucideIcon;
   badge?: number;
   activeColor?: string;
 }

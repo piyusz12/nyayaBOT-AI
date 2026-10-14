@@ -276,8 +276,8 @@ export async function startNegotiationSession(dossierId: string): Promise<Sessio
   });
 }
 
-export async function getSessionState(sessionId: string): Promise<any> {
-  return apiFetch<any>(`/api/v1/sessions/${sessionId}`);
+export async function getSessionState(sessionId: string): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>(`/api/v1/sessions/${sessionId}`);
 }
 
 export async function submitHitlDecision(
@@ -285,8 +285,8 @@ export async function submitHitlDecision(
   decision: 'approved' | 'rejected',
   notes?: string,
   modifiedResolutionFloorInr?: number
-) {
-  return apiFetch<any>(`/api/v1/sessions/${sessionId}/hitl`, {
+): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>(`/api/v1/sessions/${sessionId}/hitl`, {
     method: 'POST',
     body: JSON.stringify({
       decision,
@@ -300,14 +300,21 @@ export async function triggerKillswitch(
   sessionId: string,
   reason: string = 'User invoked emergency escalation override',
   escalateTo: string = 'grievance_officer'
-) {
-  return apiFetch<any>(`/api/v1/sessions/${sessionId}/killswitch`, {
+): Promise<Record<string, unknown>> {
+  return apiFetch<Record<string, unknown>>(`/api/v1/sessions/${sessionId}/killswitch`, {
     method: 'POST',
     body: JSON.stringify({
       reason,
       escalate_to: escalateTo,
     }),
   });
+}
+
+export interface SessionConnectedData {
+  session_id?: string;
+  status?: string;
+  timestamp?: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -317,13 +324,13 @@ export async function triggerKillswitch(
 export function subscribeSessionStream(
   sessionId: string,
   callbacks: {
-    onConnected?: (data: any) => void;
+    onConnected?: (data: SessionConnectedData) => void;
     onNodeTransition?: (nodeEvent: AgentNodeEvent) => void;
     onMessage?: (msg: NegotiationMessage) => void;
     onHitlRequired?: (hitlData: HitlPendingData) => void;
-    onResolved?: (data: any) => void;
-    onEscalated?: (data: any) => void;
-    onError?: (err: any) => void;
+    onResolved?: (data: Record<string, unknown>) => void;
+    onEscalated?: (data: Record<string, unknown>) => void;
+    onError?: (err: unknown) => void;
   }
 ): () => void {
   const url = `${API_BASE}/api/v1/sessions/${sessionId}/stream`;
@@ -374,6 +381,8 @@ export function subscribeSessionStream(
         callbacks.onResolved?.(data);
       } catch (err) {
         console.error('Failed to parse SSE session_resolved', err);
+      } finally {
+        eventSource?.close();
       }
     });
 
@@ -383,6 +392,8 @@ export function subscribeSessionStream(
         callbacks.onEscalated?.(data);
       } catch (err) {
         console.error('Failed to parse SSE session_escalated', err);
+      } finally {
+        eventSource?.close();
       }
     });
 

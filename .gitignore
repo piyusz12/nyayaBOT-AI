@@ -44,3 +44,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.tsbuildinfo
+
+# Local Agent customizations
+.agents/
+skills-lock.json
+

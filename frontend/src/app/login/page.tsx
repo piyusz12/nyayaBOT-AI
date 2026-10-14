@@ -28,8 +28,8 @@ export default function LoginPage() {
       await login(email, password);
       checkAuth();
       router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please verify credentials or try Demo Mode.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Authentication failed. Please verify credentials or try Demo Mode.');
     } finally {
       setLoading(false);
     }
@@ -48,11 +48,13 @@ export default function LoginPage() {
       await login('operator@ps30.internal', 'Password123!');
       checkAuth();
       router.push('/');
-    } catch (err: any) {
-      // If backend is offline or fails, grant local demo token
-      setToken('demo-operator-token-ps30');
-      checkAuth();
-      router.push('/');
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Demo sign-in failed. Please verify that the backend service is running at ' +
+            (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000')
+      );
     } finally {
       setLoading(false);
     }

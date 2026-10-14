@@ -10,7 +10,6 @@ import {
   Bell,
   LogOut,
   ChevronRight,
-  Shield,
   User as UserIcon,
 } from 'lucide-react';
 
@@ -76,6 +75,12 @@ export default function Header({ title }: HeaderProps) {
               )}
             </span>
           ))}
+          {title && breadcrumbItems.length === 0 && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <ChevronRight size={14} style={{ opacity: 0.5 }} />
+              <span className="breadcrumb-active">{title}</span>
+            </span>
+          )}
         </nav>
       </div>
 

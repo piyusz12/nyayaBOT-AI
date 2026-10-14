@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -19,15 +19,14 @@ class UserCreate(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     full_name: Optional[str] = None
     auth_provider: str
     is_active: bool
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class Token(BaseModel):
@@ -66,6 +65,8 @@ class CaseUpdate(BaseModel):
 
 
 class CaseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_number: str
     user_id: str
@@ -83,11 +84,10 @@ class CaseOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class CaseSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_number: str
     merchant_name: str
@@ -96,9 +96,6 @@ class CaseSummary(BaseModel):
     requested_amount: Optional[float]
     currency: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -115,6 +112,8 @@ class TransactionCreate(BaseModel):
 
 
 class TransactionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_id: str
     amount: float
@@ -125,15 +124,14 @@ class TransactionOut(BaseModel):
     description: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 # ═══════════════════════════════════════════════════════════════════
 # Evidence
 # ═══════════════════════════════════════════════════════════════════
 
 class EvidenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_id: str
     storage_key: str
@@ -145,15 +143,14 @@ class EvidenceOut(BaseModel):
     ocr_extracted_text: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 # ═══════════════════════════════════════════════════════════════════
 # Dossier
 # ═══════════════════════════════════════════════════════════════════
 
 class DossierOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     case_id: str
     verified_facts: str
     resolution_constraints: str
@@ -161,9 +158,6 @@ class DossierOut(BaseModel):
     evidence_summary: Optional[str]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -176,6 +170,8 @@ class ActionCreate(BaseModel):
 
 
 class ActionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_id: str
     action_type: str
@@ -185,9 +181,6 @@ class ActionOut(BaseModel):
     created_at: datetime
     executed_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
-
 
 class ApprovalDecision(BaseModel):
     decision: str  # "approved" or "rejected"
@@ -195,6 +188,8 @@ class ApprovalDecision(BaseModel):
 
 
 class ApprovalOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     action_id: str
     decision: Optional[str]
@@ -202,9 +197,6 @@ class ApprovalOut(BaseModel):
     decided_by: Optional[str]
     notes: Optional[str]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -217,6 +209,8 @@ class EscalationCreate(BaseModel):
 
 
 class EscalationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_id: str
     channel: str
@@ -227,24 +221,20 @@ class EscalationOut(BaseModel):
     resolved_at: Optional[datetime]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 # ═══════════════════════════════════════════════════════════════════
 # Audit
 # ═══════════════════════════════════════════════════════════════════
 
 class AuditEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     case_id: str
     event_type: str
     timestamp: datetime
     actor: Optional[str]
     payload: str
-
-    class Config:
-        from_attributes = True
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.core.exceptions import AuthorizationError, DuplicateSubmissionError, ValidationError
 from app.database import get_db
 from app.models import Action, Approval, Case, User
 from app.services.approval_service import process_hitl_decision
@@ -65,11 +66,23 @@ def decide_approval_endpoint(
     if not case:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
-    res = process_hitl_decision(
-        db=db,
-        user=user,
-        case_id=case.id,
-        decision=payload.decision,
-        notes=payload.notes,
-    )
-    return res
+    if action.status not in {"proposed", "pending"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Action {action_id} has already been decided with status '{action.status}'.",
+        )
+
+    try:
+        res = process_hitl_decision(
+            db=db,
+            user=user,
+            case_id=case.id,
+            decision=payload.decision,
+            notes=payload.notes,
+            action_id=action.id,
+        )
+        return res
+    except DuplicateSubmissionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except (ValidationError, AuthorizationError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

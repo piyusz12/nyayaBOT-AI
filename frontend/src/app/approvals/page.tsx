@@ -140,16 +140,17 @@ export default function ApprovalCenterPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {pendingActions.map((action) => {
-              let payloadObj: any = {};
+              let payloadObj: Record<string, unknown> = {};
               try {
                 payloadObj = JSON.parse(action.payload);
               } catch {
                 payloadObj = { raw: action.payload };
               }
 
-              const offerAmt = payloadObj.offer_amount_inr || payloadObj.amount || (action.requested_amount ? action.requested_amount * 0.75 : 0);
+              const rawOffer = payloadObj.offer_amount_inr ?? payloadObj.amount;
+              const offerAmt = typeof rawOffer === 'number' ? rawOffer : null;
               const requestedAmt = action.requested_amount || 0;
-              const difference = Math.max(0, requestedAmt - offerAmt);
+              const difference = offerAmt !== null ? Math.max(0, requestedAmt - offerAmt) : null;
 
               return (
                 <div key={action.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
@@ -177,7 +178,7 @@ export default function ApprovalCenterPage() {
                     <div className="hitl-metric-item">
                       <div className="hitl-metric-label">Proposed Settlement Offer</div>
                       <div className="hitl-metric-val" style={{ color: 'var(--success)' }}>
-                        ₹{offerAmt.toLocaleString('en-IN')}
+                        {offerAmt !== null ? `₹${offerAmt.toLocaleString('en-IN')}` : 'Not Specified'}
                       </div>
                     </div>
                     <div className="hitl-metric-item">
@@ -189,7 +190,7 @@ export default function ApprovalCenterPage() {
                     <div className="hitl-metric-item">
                       <div className="hitl-metric-label">Haircut / Forfeited</div>
                       <div className="hitl-metric-val" style={{ color: 'var(--warning)' }}>
-                        -₹{difference.toLocaleString('en-IN')}
+                        {difference !== null ? `-₹${difference.toLocaleString('en-IN')}` : 'N/A'}
                       </div>
                     </div>
                   </div>

@@ -82,6 +82,7 @@ def create_escalation(
         submitted_at=datetime.now(timezone.utc),
     )
     db.add(escalation)
+    db.flush()
 
     case.status = "escalated"
     case.updated_at = datetime.now(timezone.utc)

@@ -75,6 +75,26 @@ class TestPS30Endpoints(unittest.TestCase):
     def test_06_hitl_approval_decision(self):
         session_id = getattr(TestPS30Endpoints, "created_session_id", None)
         self.assertIsNotNone(session_id)
+
+        # 1. Premature submission while session is still NEGOTIATING must return 409 Conflict
+        premature_resp = self.client.post(f"/api/v1/sessions/{session_id}/hitl", json={
+            "decision": "approved",
+            "notes": "Premature attempt",
+        }, headers=self.headers)
+        self.assertEqual(premature_resp.status_code, 409)
+
+        # 2. Advance session to AWAITING_HITL with pending offer
+        from app.services.session_service import ACTIVE_SESSIONS
+        ACTIVE_SESSIONS[session_id]["status"] = "AWAITING_HITL"
+        ACTIVE_SESSIONS[session_id]["latest_offer_inr"] = 2975.00
+        ACTIVE_SESSIONS[session_id]["pending_hitl"] = {
+            "session_id": session_id,
+            "status": "AWAITING_APPROVAL",
+            "offer_amount_inr": 2975.00,
+            "requested_amount_inr": 3500.00,
+        }
+
+        # 3. Valid HITL decision
         resp = self.client.post(f"/api/v1/sessions/{session_id}/hitl", json={
             "decision": "approved",
             "notes": "Accepted under supervisor sign-off",
@@ -83,6 +103,12 @@ class TestPS30Endpoints(unittest.TestCase):
         data = resp.json()
         self.assertEqual(data["decision"], "approved")
         self.assertEqual(data["new_session_status"], "RESOLVED")
+
+        # 4. Duplicate/replay submission on resolved session must return 409 Conflict
+        replay_resp = self.client.post(f"/api/v1/sessions/{session_id}/hitl", json={
+            "decision": "approved",
+        }, headers=self.headers)
+        self.assertEqual(replay_resp.status_code, 409)
 
     def test_07_document_generation(self):
         dossier_id = getattr(TestPS30Endpoints, "created_dossier_id", None)
@@ -95,6 +121,48 @@ class TestPS30Endpoints(unittest.TestCase):
         data = resp.json()
         self.assertIn("content", data)
         self.assertIn("Grievance Redressal Officer", data["content"])
+
+    def test_08_approval_action_decide_and_duplicate_rejection(self):
+        from app.database import SessionLocal
+        from app.models import Action
+
+        dossier_id = getattr(TestPS30Endpoints, "created_dossier_id", None)
+        self.assertIsNotNone(dossier_id)
+
+        # 1. Create a proposed action directly in DB
+        db = SessionLocal()
+        try:
+            action = Action(
+                case_id=dossier_id,
+                action_type="settlement_offer_decision",
+                status="proposed",
+                payload='{"offer_amount_inr": 2500.0}',
+            )
+            db.add(action)
+            db.commit()
+            db.refresh(action)
+            action_id = action.id
+        finally:
+            db.close()
+
+        # 2. Decide the proposed action
+        resp = self.client.post(
+            f"/api/v1/approvals/{action_id}/decide",
+            json={"decision": "approved", "notes": "Approved in test_08"},
+            headers=self.headers,
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["action_id"], action_id)
+        self.assertEqual(data["decision"], "approved")
+
+        # 3. Duplicate decision on already decided action must return 409 Conflict
+        dup_resp = self.client.post(
+            f"/api/v1/approvals/{action_id}/decide",
+            json={"decision": "approved", "notes": "Duplicate attempt"},
+            headers=self.headers,
+        )
+        self.assertEqual(dup_resp.status_code, 409)
 
 
 if __name__ == "__main__":

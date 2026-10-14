@@ -30,7 +30,7 @@ def response_generation_node(state: DisputeAgentState) -> Dict[str, Any]:
             response_text = (
                 f"The offer of ₹{offer:,.2f} is unacceptable as it fails to meet the minimum restitution floor (₹{floor:,.2f}) "
                 f"for the unauthorized debit of ₹{req_amt:,.2f}. Under the {statutes_str}, continuing to withhold full "
-                "reimbursement constitutes an unfair trade practice. We request immediate reversal of ₹{floor:,.2f} minimum "
+                f"reimbursement constitutes an unfair trade practice. We request immediate reversal of ₹{floor:,.2f} minimum "
                 "to avert escalation to the Grievance Redressal Officer."
             )
     else:

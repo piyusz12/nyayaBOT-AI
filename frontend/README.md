@@ -8,7 +8,7 @@ This is the production frontend for **PS 30 Counter-Agent**, built using Next.js
 
 ## 🏛️ Application Architecture & Navigation
 
-The frontend provides 10 key operational workspaces:
+The frontend provides 13 key operational workspaces:
 
 1. **Executive Dashboard (`/`)**: Real-time KPI metrics, 6-stage case pipeline ribbon, attention banners, and live system activity feed.
 2. **Dispute Dossiers (`/cases`)**: Filterable, searchable portfolio of active consumer claims.
@@ -40,7 +40,7 @@ The frontend provides 10 key operational workspaces:
 Create `.env.local` based on `.env.example`:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ---

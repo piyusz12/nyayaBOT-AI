@@ -6,12 +6,13 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.core.exceptions import AuthorizationError, DuplicateSubmissionError, ValidationError
 from app.database import get_db
 from app.models import Case, Conversation, Dossier, User
 from app.services.approval_service import process_hitl_decision
@@ -104,11 +105,17 @@ def get_session_endpoint(
             raise HTTPException(status_code=404, detail="Case associated with session not found")
         get_or_init_session(session_id, case, dossier)
 
-    return ACTIVE_SESSIONS[session_id]
+    session = ACTIVE_SESSIONS[session_id]
+    case = db.query(Case).filter(Case.id == session["case_id"], Case.user_id == user.id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Session not found or unauthorized")
+
+    return session
 
 
 @router.get("/{session_id}/stream")
 async def stream_session_endpoint(
+    request: Request,
     session_id: str,
     db: Session = Depends(get_db),
 ):
@@ -124,7 +131,7 @@ async def stream_session_endpoint(
         get_or_init_session(session_id, case, dossier)
 
     return StreamingResponse(
-        generate_sse_events(session_id, db),
+        generate_sse_events(session_id, db, request=request),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -153,15 +160,26 @@ def submit_hitl_endpoint(
             raise HTTPException(status_code=404, detail="Case associated with session not found")
         session = get_or_init_session(session_id, case, dossier)
 
-    result = process_hitl_decision(
-        db=db,
-        user=user,
-        case_id=session["case_id"],
-        decision=payload.decision,
-        offer_amount_inr=session.get("latest_offer_inr"),
-        notes=payload.notes,
-        modified_floor_inr=payload.modified_resolution_floor_inr,
-    )
+    if session.get("status") != "AWAITING_HITL" or not session.get("pending_hitl"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is not currently awaiting a human approval decision or no pending offer exists.",
+        )
+
+    try:
+        result = process_hitl_decision(
+            db=db,
+            user=user,
+            case_id=session["case_id"],
+            decision=payload.decision,
+            offer_amount_inr=session.get("latest_offer_inr"),
+            notes=payload.notes,
+            modified_floor_inr=payload.modified_resolution_floor_inr,
+        )
+    except DuplicateSubmissionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except (ValidationError, AuthorizationError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     session["status"] = "RESOLVED" if payload.decision.lower() == "approved" else "ESCALATE_EXTERNAL"
     session["pending_hitl"] = None

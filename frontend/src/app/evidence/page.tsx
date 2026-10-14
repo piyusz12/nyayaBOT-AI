@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/lib/auth-context';
 import {
@@ -28,7 +29,8 @@ interface EnrichedEvidence extends EvidenceItem {
 }
 
 export default function EvidenceVaultPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [cases, setCases] = useState<CaseSummary[]>([]);
   const [allEvidence, setAllEvidence] = useState<EnrichedEvidence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,8 +72,16 @@ export default function EvidenceVaultPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated) loadEvidenceVault();
-  }, [isAuthenticated]);
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    if (isAuthenticated) {
+      loadEvidenceVault();
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || !isAuthenticated) return null;
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !selectedCaseForUpload) return;

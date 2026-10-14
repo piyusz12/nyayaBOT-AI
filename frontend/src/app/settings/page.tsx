@@ -2,22 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
-import { useAuth } from '@/lib/auth-context';
 import { checkBackendHealth } from '@/lib/api';
 import {
-  Settings,
   Server,
   Shield,
   Sliders,
-  User,
-  Bell,
   RefreshCw,
   CheckCircle,
 } from 'lucide-react';
 
+interface BackendHealthInfo {
+  status: string;
+  service: string;
+  version: string;
+  database_connected?: boolean;
+}
+
 export default function SettingsPage() {
-  const { isAuthenticated } = useAuth();
-  const [backendStatus, setBackendStatus] = useState<any>(null);
+  const [backendStatus, setBackendStatus] = useState<BackendHealthInfo | null>(null);
   const [checking, setChecking] = useState(false);
 
   // Agent Settings
@@ -35,11 +37,39 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    pingBackend();
+    const timer = setTimeout(() => {
+      pingBackend();
+      try {
+        const stored = localStorage.getItem('ps30_governance_rules');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.defaultResolutionFloor) setDefaultResolutionFloor(parsed.defaultResolutionFloor);
+          if (parsed.similarityThreshold) setSimilarityThreshold(parsed.similarityThreshold);
+          if (parsed.maxStalledTurns) setMaxStalledTurns(parsed.maxStalledTurns);
+          if (typeof parsed.autoKillswitchOnHighSim === 'boolean') setAutoKillswitchOnHighSim(parsed.autoKillswitchOnHighSim);
+        }
+      } catch {
+        // ignore
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+    try {
+      localStorage.setItem(
+        'ps30_governance_rules',
+        JSON.stringify({
+          defaultResolutionFloor,
+          similarityThreshold,
+          maxStalledTurns,
+          autoKillswitchOnHighSim,
+        })
+      );
+    } catch {
+      // ignore
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2500);
   };

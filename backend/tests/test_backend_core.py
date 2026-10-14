@@ -222,7 +222,8 @@ class TestPS30BackendCore(unittest.TestCase):
     # ── 8. ReportLab PDF Document Compilation ────────────────────────
     def test_13_pdf_document_compilation(self):
         title = "Statutory Grievance Notice — Test Merchant"
-        body = "This is a formal test notice compiled via ReportLab."
+        unbroken_token = "SHA256_" + ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" * 4)
+        body = f"This is a formal test notice compiled via ReportLab.\nEVIDENCE DIGEST: {unbroken_token}\nConclusion."
         pdf_bytes = compile_pdf_document(title, body)
         self.assertTrue(pdf_bytes.startswith(b"%PDF"))
         self.assertGreater(len(pdf_bytes), 500)

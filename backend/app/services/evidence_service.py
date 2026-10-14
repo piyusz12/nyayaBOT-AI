@@ -81,7 +81,8 @@ def save_evidence(db: Session, case_id: str, upload_file: UploadFile) -> Evidenc
     )
     if existing:
         existing.validation_status = "duplicate"
-        db.flush()
+        db.commit()
+        db.refresh(existing)
         return existing
 
     file_ext = Path(upload_file.filename or "evidence.bin").suffix

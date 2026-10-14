@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { useAuth } from '@/lib/auth-context';
 import { listCases, getAuditTrail, type AuditItem } from '@/lib/api';
@@ -20,7 +21,8 @@ interface EnrichedAuditEvent extends AuditItem {
 }
 
 export default function AuditPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [events, setEvents] = useState<EnrichedAuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,8 +53,16 @@ export default function AuditPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated) loadAudit();
-  }, [isAuthenticated]);
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    if (isAuthenticated) {
+      loadAudit();
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading || !isAuthenticated) return null;
 
   const filteredEvents = events.filter((e) => {
     if (actorFilter !== 'all' && (e.actor || 'system') !== actorFilter) return false;

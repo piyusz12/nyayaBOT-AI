@@ -97,19 +97,29 @@ export default function CreateDossierPage() {
       const resp = await createDossierV1(payload);
 
       // Upload staged evidence files to the created case
+      const failedFiles: string[] = [];
       if (stagedFiles.length > 0) {
         for (const item of stagedFiles) {
           try {
             await uploadEvidence(resp.case_id, item.file);
           } catch (e) {
             console.error('Evidence upload failed for file', item.file.name, e);
+            failedFiles.push(item.file.name);
           }
         }
       }
 
+      if (failedFiles.length > 0) {
+        alert(
+          `Dossier created successfully, but ${failedFiles.length} evidence file(s) failed to upload:\n` +
+          failedFiles.map((f) => `• ${f}`).join('\n') +
+          '\n\nYou can re-upload them from the Evidence tab in the case workspace.'
+        );
+      }
+
       router.push(`/cases/${resp.case_id}`);
-    } catch (err: any) {
-      setSubmissionError(err.message || 'Failed to submit dispute dossier');
+    } catch (err: unknown) {
+      setSubmissionError(err instanceof Error ? err.message : 'Failed to submit dispute dossier');
       setSubmitting(false);
     }
   };

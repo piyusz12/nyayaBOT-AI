@@ -32,6 +32,7 @@ def process_hitl_decision(
     offer_amount_inr: Optional[float] = None,
     notes: Optional[str] = None,
     modified_floor_inr: Optional[float] = None,
+    action_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute and persist a Human-in-the-Loop settlement decision."""
     case = db.query(Case).filter(Case.id == case_id).first()
@@ -46,35 +47,59 @@ def process_hitl_decision(
     if decision_clean not in {"approved", "rejected"}:
         raise ValidationError(f"Invalid decision: '{decision}'. Must be 'approved' or 'rejected'.")
 
-    # Check for duplicate action submission
-    existing_action = (
-        db.query(Action)
-        .filter(Action.case_id == case.id, Action.action_type == "settlement_offer_decision")
-        .order_by(Action.created_at.desc())
-        .first()
-    )
+    if action_id:
+        action = db.query(Action).filter(Action.id == action_id).first()
+        if not action:
+            raise NotFoundError(f"Action with ID {action_id} not found.")
+        if action.case_id != case.id:
+            raise AuthorizationError("Action does not belong to this case.")
+        if action.status in {"approved", "rejected"}:
+            raise DuplicateSubmissionError(f"Action {action_id} has already been decided ({action.status}).")
 
-    if existing_action and existing_action.status in {"approved", "rejected"}:
-        # Verify if an existing decided action has an approval record
-        if existing_action.approval and existing_action.approval.decision:
-            # Check if this exact action was already decided
-            pass
+        action.status = decision_clean
+        action.executed_at = datetime.now(timezone.utc)
+        if action.payload:
+            try:
+                p = json.loads(action.payload)
+                p.update({
+                    "decision": decision_clean,
+                    "notes": notes,
+                    "offer_amount_inr": offer_amount_inr or p.get("offer_amount_inr"),
+                    "modified_resolution_floor_inr": modified_floor_inr,
+                })
+                action.payload = json.dumps(p)
+            except Exception:
+                pass
+    else:
+        # Check for duplicate action submission
+        existing_action = (
+            db.query(Action)
+            .filter(Action.case_id == case.id, Action.action_type == "settlement_offer_decision")
+            .order_by(Action.created_at.desc())
+            .first()
+        )
 
-    # Create new Action record
-    payload = {
-        "offer_amount_inr": offer_amount_inr,
-        "decision": decision_clean,
-        "notes": notes,
-        "modified_resolution_floor_inr": modified_floor_inr,
-    }
-    action = Action(
-        case_id=case.id,
-        action_type="settlement_offer_decision",
-        status=decision_clean,
-        payload=json.dumps(payload),
-    )
-    db.add(action)
-    db.flush()
+        if existing_action and existing_action.status in {"approved", "rejected"}:
+            if existing_action.approval and existing_action.approval.decision:
+                raise DuplicateSubmissionError(
+                    f"Settlement offer for case {case.id} has already been decided ({existing_action.status})."
+                )
+
+        payload = {
+            "offer_amount_inr": offer_amount_inr,
+            "decision": decision_clean,
+            "notes": notes,
+            "modified_resolution_floor_inr": modified_floor_inr,
+        }
+        action = Action(
+            case_id=case.id,
+            action_type="settlement_offer_decision",
+            status=decision_clean,
+            payload=json.dumps(payload),
+            executed_at=datetime.now(timezone.utc),
+        )
+        db.add(action)
+        db.flush()
 
     # Create Approval record
     approval = Approval(

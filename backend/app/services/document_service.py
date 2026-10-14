@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 
 from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 
 from app.core.exceptions import NotFoundError, ValidationError
@@ -140,13 +141,33 @@ def compile_pdf_document(title: str, body_text: str) -> bytes:
     y = height - 95
     line_height = 13
 
+    max_w = width - 100
     for line in body_text.split("\n"):
-        if y < 50:
-            p.showPage()
-            p.setFont("Helvetica", 9)
-            y = height - 50
-        p.drawString(50, y, line[:95])
-        y -= line_height
+        chunks = simpleSplit(line, "Helvetica", 9, max_w) or [""]
+        for chunk in chunks:
+            # Further split unbroken tokens wider than max_w by measured text width
+            sub_chunks = []
+            if p.stringWidth(chunk, "Helvetica", 9) > max_w:
+                current_sub = ""
+                for char in chunk:
+                    if p.stringWidth(current_sub + char, "Helvetica", 9) <= max_w:
+                        current_sub += char
+                    else:
+                        if current_sub:
+                            sub_chunks.append(current_sub)
+                        current_sub = char
+                if current_sub:
+                    sub_chunks.append(current_sub)
+            else:
+                sub_chunks = [chunk]
+
+            for sub_chunk in sub_chunks:
+                if y < 50:
+                    p.showPage()
+                    p.setFont("Helvetica", 9)
+                    y = height - 50
+                p.drawString(50, y, sub_chunk)
+                y -= line_height
 
     p.save()
     buffer.seek(0)
@@ -175,7 +196,8 @@ def generate_document(
         content = generate_complaint_draft_text(case, dossier, custom_notes)
     elif document_type == "events_chronology":
         title = f"Chronological Statement of Facts — {case.merchant_name}"
-        content = f"CHRONOLOGICAL STATEMENT OF FACTS\nCASE: {case.case_number}\n\n1. Initial Transaction: Disputed charge of INR {case.requested_amount:,.2f}.\n2. Dispute Notice: Formal cancellation communication logged.\n3. Escalation: Proceeding under Consumer Protection Act 2019."
+        amt_str = f"{(case.requested_amount or 0.0):,.2f}"
+        content = f"CHRONOLOGICAL STATEMENT OF FACTS\nCASE: {case.case_number}\n\n1. Initial Transaction: Disputed charge of INR {amt_str}.\n2. Dispute Notice: Formal cancellation communication logged.\n3. Escalation: Proceeding under Consumer Protection Act 2019."
     elif document_type == "evidence_index":
         title = f"Evidence Ledger Index — {case.merchant_name}"
         evidence_items = db.query(Evidence).filter(Evidence.case_id == case.id).all()

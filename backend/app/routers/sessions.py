@@ -388,9 +388,12 @@ def get_session_state(
         dossier = db.query(Dossier).filter(Dossier.case_id == conv.case_id).first()
         if not case or not dossier:
             raise HTTPException(status_code=404, detail="Case associated with session not found")
-        _get_or_init_session(session_id, case, dossier)
+    session = ACTIVE_SESSIONS[session_id]
+    case = db.query(Case).filter(Case.id == session["case_id"], Case.user_id == user.id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Session not found or unauthorized")
 
-    return ACTIVE_SESSIONS[session_id]
+    return session
 
 
 @router.get("/sessions/{session_id}/stream")

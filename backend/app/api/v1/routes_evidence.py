@@ -17,7 +17,7 @@ router = APIRouter(prefix="/evidence", tags=["v1-evidence"])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def upload_evidence_endpoint(
+def upload_evidence_endpoint(
     case_id: str = Form(...),
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
