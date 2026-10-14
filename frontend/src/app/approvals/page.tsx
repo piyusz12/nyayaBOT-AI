@@ -39,6 +39,7 @@ export default function ApprovalCenterPage() {
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const loadPending = async () => {
     try {
@@ -79,18 +80,17 @@ export default function ApprovalCenterPage() {
   }, [isAuthenticated, authLoading, router]);
 
   const handleDecision = async (action: ApprovalCardData, decision: 'approved' | 'rejected') => {
-    const confirmMsg =
-      decision === 'approved'
-        ? `Are you sure you want to APPROVE this consequential action for ${action.merchant}?\nThis decision is binding under case audit logs.`
-        : `Are you sure you want to REJECT this offer from ${action.merchant}?\nThis will trigger statutory escalation to the Grievance Redressal Officer (GRO).`;
-
-    if (!confirm(confirmMsg)) return;
-
     setProcessingId(action.id);
+    setSuccessMsg(null);
     const notes = decisionNotes[action.id] || '';
 
     try {
       await approveAction(action.id, decision, notes);
+      setSuccessMsg(
+        decision === 'approved'
+          ? `Action approved successfully for ${action.merchant}. Case status updated.`
+          : `Action rejected. Case escalated to Grievance Redressal Officer (GRO).`
+      );
       await loadPending();
     } catch (err: any) {
       alert(err.message || 'Failed to process decision');
@@ -114,6 +114,27 @@ export default function ApprovalCenterPage() {
             </p>
           </div>
         </div>
+
+        {successMsg && (
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(20, 184, 166, 0.15)',
+              border: '1px solid var(--teal)',
+              color: 'var(--teal)',
+              fontSize: 13,
+              fontWeight: 600,
+              marginBottom: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <CheckCircle size={16} />
+            <span>{successMsg}</span>
+          </div>
+        )}
 
         {loading ? (
           <div>
@@ -147,7 +168,7 @@ export default function ApprovalCenterPage() {
                 payloadObj = { raw: action.payload };
               }
 
-              const rawOffer = payloadObj.offer_amount_inr ?? payloadObj.amount;
+              const rawOffer = payloadObj.merchant_offer_inr ?? payloadObj.offer_amount_inr ?? payloadObj.amount;
               const offerAmt = typeof rawOffer === 'number' ? rawOffer : null;
               const requestedAmt = action.requested_amount || 0;
               const difference = offerAmt !== null ? Math.max(0, requestedAmt - offerAmt) : null;

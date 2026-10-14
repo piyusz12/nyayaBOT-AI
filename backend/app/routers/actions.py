@@ -79,18 +79,30 @@ def approve_or_reject(
 
     approval = action.approval
     if not approval:
-        raise HTTPException(status_code=404, detail="Approval record not found")
-
-    if approval.decision is not None:
-        raise HTTPException(status_code=409, detail="Already decided")
-
-    approval.decision = data.decision
-    approval.decided_at = datetime.now(timezone.utc)
-    approval.decided_by = user.id
-    approval.notes = data.notes
+        approval = Approval(
+            action_id=action.id,
+            decision=data.decision,
+            decided_at=datetime.now(timezone.utc),
+            decided_by=user.id,
+            notes=data.notes,
+        )
+        db.add(approval)
+    else:
+        approval.decision = data.decision
+        approval.decided_at = datetime.now(timezone.utc)
+        approval.decided_by = user.id
+        approval.notes = data.notes
 
     # Update action status
     action.status = data.decision  # "approved" or "rejected"
+    action.executed_at = datetime.now(timezone.utc)
+
+    # Update case status
+    if data.decision == "approved":
+        case.status = "resolved"
+    else:
+        case.status = "escalated"
+    case.updated_at = datetime.now(timezone.utc)
 
     log_event(db, case_id=action.case_id, event_type=f"action_{data.decision}", actor="user", payload={
         "action_id": action_id,

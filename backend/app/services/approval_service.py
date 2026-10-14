@@ -71,7 +71,7 @@ def process_hitl_decision(
             except Exception:
                 pass
     else:
-        # Check for duplicate action submission
+        # Check for duplicate or existing pending action
         existing_action = (
             db.query(Action)
             .filter(Action.case_id == case.id, Action.action_type == "settlement_offer_decision")
@@ -79,37 +79,45 @@ def process_hitl_decision(
             .first()
         )
 
-        if existing_action and existing_action.status in {"approved", "rejected"}:
-            if existing_action.approval and existing_action.approval.decision:
-                raise DuplicateSubmissionError(
-                    f"Settlement offer for case {case.id} has already been decided ({existing_action.status})."
-                )
-
         payload = {
             "offer_amount_inr": offer_amount_inr,
             "decision": decision_clean,
             "notes": notes,
             "modified_resolution_floor_inr": modified_floor_inr,
         }
-        action = Action(
-            case_id=case.id,
-            action_type="settlement_offer_decision",
-            status=decision_clean,
-            payload=json.dumps(payload),
-            executed_at=datetime.now(timezone.utc),
-        )
-        db.add(action)
-        db.flush()
 
-    # Create Approval record
-    approval = Approval(
-        action_id=action.id,
-        decision=decision_clean,
-        decided_at=datetime.now(timezone.utc),
-        decided_by=user.id,
-        notes=notes or ("Approved under supervisor sign-off" if decision_clean == "approved" else "Rejected offer"),
-    )
-    db.add(approval)
+        if existing_action and existing_action.status in {"proposed", "pending"}:
+            action = existing_action
+            action.status = decision_clean
+            action.payload = json.dumps(payload)
+            action.executed_at = datetime.now(timezone.utc)
+        else:
+            action = Action(
+                case_id=case.id,
+                action_type="settlement_offer_decision",
+                status=decision_clean,
+                payload=json.dumps(payload),
+                executed_at=datetime.now(timezone.utc),
+            )
+            db.add(action)
+            db.flush()
+
+    # Create or update Approval record safely
+    if action.approval:
+        approval = action.approval
+        approval.decision = decision_clean
+        approval.decided_at = datetime.now(timezone.utc)
+        approval.decided_by = user.id
+        approval.notes = notes or ("Approved under supervisor sign-off" if decision_clean == "approved" else "Rejected offer")
+    else:
+        approval = Approval(
+            action_id=action.id,
+            decision=decision_clean,
+            decided_at=datetime.now(timezone.utc),
+            decided_by=user.id,
+            notes=notes or ("Approved under supervisor sign-off" if decision_clean == "approved" else "Rejected offer"),
+        )
+        db.add(approval)
 
     # Update case lifecycle status
     if decision_clean == "approved":
