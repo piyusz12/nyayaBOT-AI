@@ -1,6 +1,6 @@
-"""DisputeAgentState TypedDict schema for LangGraph cyclic orchestration.
+"""DisputeAgentState TypedDict schema for LangGraph multi-agent orchestration.
 
-Models state for PS 30 consumer dispute counter-agent.
+Models comprehensive state for PS 30 consumer dispute counter-agent.
 """
 
 from __future__ import annotations
@@ -10,34 +10,53 @@ from langgraph.graph.message import add_messages
 
 
 class DisputeAgentState(TypedDict):
+    # Identifiers
     dossier_id: str
     case_id: str
+    case_number: str
     merchant_name: str
     dispute_type: str
     requested_amount_inr: float
+    resolution_floor_inr: float
+    accept_store_credit: bool
     currency: str
 
-    # History of messages with reducer
+    # Workflow positioning
+    current_node: str
+    status: str  # "INITIALIZING" | "NEGOTIATING" | "AWAITING_HITL" | "ESCALATE_EXTERNAL" | "RESOLVED" | "BLOCKED"
+    turn: int
+    max_turns: int
+
+    # Messages
     messages: Annotated[List[Any], add_messages]
+    incoming_merchant_message: Optional[str]
+    prior_merchant_messages: List[str]
 
-    # History of corporate turn embeddings: {e_1, ..., e_{t-1}}
+    # Loop detection & telemetry
     bot_embeddings: List[List[float]]
-
-    # Classified violations (e.g. "Annexure I(5): Subscription Trap")
-    detected_dark_patterns: List[str]
-
-    # Grounded legal statutes (e.g. CPA 2019 Sec 2(47), E-Commerce Rules 2020)
-    active_statutes: List[str]
-
-    # Stalled turns counter: increments on S_max >= 0.95 or 2x >= 0.88
+    s_max: float
     stalled_turns: int
     consecutive_high_sim_count: int
+    loop_breaker_triggered: bool
+    circuit_breaker_tripped: bool
 
-    # Financial settlement offers from merchant
+    # Legal grounding & Dark pattern analysis
+    detected_dark_patterns: List[str]
+    active_statutes: List[str]
+    retrieved_provisions: List[Dict[str, Any]]
+
+    # Strategy & Generation
+    strategy_recommendation: Optional[str]
+    proposed_response: Optional[str]
+
+    # Sentinel Safety Gate
+    sentinel_verdict: Optional[str]  # "ALLOW" | "BLOCK" | "REQUIRE_APPROVAL" | "REQUIRE_REVIEW"
+    sentinel_reason: Optional[str]
+
+    # Financial offer & Human-in-the-loop
     latest_offer_inr: Optional[float]
-    resolution_floor_inr: float
+    pending_hitl: Optional[Dict[str, Any]]
 
-    # Execution status: "NEGOTIATING" | "AWAITING_HITL" | "ESCALATE_EXTERNAL" | "RESOLVED"
-    status: str
+    # Execution metadata & error tracking
     error: Optional[str]
     metadata: Dict[str, Any]

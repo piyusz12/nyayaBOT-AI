@@ -6,7 +6,8 @@ import hashlib
 import os
 import uuid
 from pathlib import Path
-
+from typing import Optional
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -46,7 +47,7 @@ async def store_evidence(
     full_path.parent.mkdir(parents=True, exist_ok=True)
     full_path.write_bytes(file_data)
 
-    # OCR extraction stub
+    # OCR extraction
     ocr_text = None
     if content_type and content_type.startswith("image/"):
         ocr_text = _extract_text_from_image(full_path)
@@ -68,6 +69,71 @@ async def store_evidence(
     return evidence
 
 
+def save_evidence(db: Session, case_id: str, upload_file: UploadFile) -> Evidence:
+    """Synchronous wrapper for storing evidence from FastAPI UploadFile."""
+    content = upload_file.file.read()
+    sha256 = _compute_sha256(content)
+
+    existing = (
+        db.query(Evidence)
+        .filter(Evidence.case_id == case_id, Evidence.sha256 == sha256)
+        .first()
+    )
+    if existing:
+        existing.validation_status = "duplicate"
+        db.flush()
+        return existing
+
+    file_ext = Path(upload_file.filename or "evidence.bin").suffix
+    storage_key = f"{case_id}/{uuid.uuid4().hex}{file_ext}"
+    full_path = Path(settings.EVIDENCE_STORAGE_PATH) / storage_key
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    full_path.write_bytes(content)
+
+    ocr_text = None
+    ct = upload_file.content_type or "application/octet-stream"
+    if ct.startswith("image/"):
+        ocr_text = _extract_text_from_image(full_path)
+    elif ct == "application/pdf":
+        ocr_text = _extract_text_from_pdf(full_path)
+
+    evidence = Evidence(
+        case_id=case_id,
+        storage_key=storage_key,
+        sha256=sha256,
+        original_filename=upload_file.filename,
+        content_type=ct,
+        file_size_bytes=len(content),
+        validation_status="valid",
+        ocr_extracted_text=ocr_text,
+    )
+    db.add(evidence)
+    db.commit()
+    db.refresh(evidence)
+    return evidence
+
+
+def get_evidence_by_id(db: Session, evidence_id: str) -> Optional[Evidence]:
+    return db.query(Evidence).filter(Evidence.id == evidence_id).first()
+
+
+def list_evidence_for_case(db: Session, case_id: str) -> list[Evidence]:
+    return get_evidence_list(db, case_id)
+
+
+def get_evidence_list(db: Session, case_id: str) -> list[Evidence]:
+    return (
+        db.query(Evidence)
+        .filter(Evidence.case_id == case_id)
+        .order_by(Evidence.created_at.desc())
+        .all()
+    )
+
+
+def get_evidence_path(storage_key: str) -> Path:
+    return Path(settings.EVIDENCE_STORAGE_PATH) / storage_key
+
+
 def _extract_text_from_image(path: Path) -> str | None:
     """Attempt OCR on an image file using Tesseract."""
     try:
@@ -84,10 +150,9 @@ def _extract_text_from_image(path: Path) -> str | None:
 
 
 def _extract_text_from_pdf(path: Path) -> str | None:
-    """Extract text from a PDF using PyMuPDF."""
+    """Extract text from a PDF."""
     try:
         import fitz  # PyMuPDF
-
         doc = fitz.open(str(path))
         text_parts = []
         for page in doc:
@@ -97,16 +162,3 @@ def _extract_text_from_pdf(path: Path) -> str | None:
         return full_text if full_text else None
     except Exception:
         return None
-
-
-def get_evidence_list(db: Session, case_id: str) -> list[Evidence]:
-    return (
-        db.query(Evidence)
-        .filter(Evidence.case_id == case_id)
-        .order_by(Evidence.created_at.desc())
-        .all()
-    )
-
-
-def get_evidence_path(storage_key: str) -> Path:
-    return Path(settings.EVIDENCE_STORAGE_PATH) / storage_key
