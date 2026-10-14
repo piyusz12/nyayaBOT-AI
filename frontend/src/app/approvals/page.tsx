@@ -2,37 +2,64 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Header from '@/components/Header';
 import { useAuth } from '@/lib/auth-context';
-import { listCases, listActions, approveAction, type CaseSummary, type ActionItem } from '@/lib/api';
+import {
+  listCases,
+  listActions,
+  approveAction,
+  submitHitlDecision,
+  type ActionItem,
+  type CaseSummary,
+} from '@/lib/api';
+import {
+  UserCheck,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Scale,
+  ArrowRight,
+  ShieldAlert,
+  Clock,
+  DollarSign,
+} from 'lucide-react';
 
-export default function ApprovalsPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+interface ApprovalCardData extends ActionItem {
+  case_number: string;
+  merchant: string;
+  requested_amount: number | null;
+}
+
+export default function ApprovalCenterPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
-  const [pendingActions, setPendingActions] = useState<(ActionItem & { case_number: string; merchant: string })[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-    if (isAuthenticated) {
-      loadPending();
-    }
-  }, [isAuthenticated, isLoading, router]);
+  const [pendingActions, setPendingActions] = useState<ApprovalCardData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [decisionNotes, setDecisionNotes] = useState<Record<string, string>>({});
 
   const loadPending = async () => {
     try {
       const cases = await listCases();
-      const allPending: (ActionItem & { case_number: string; merchant: string })[] = [];
+      const allPending: ApprovalCardData[] = [];
 
       for (const c of cases) {
-        const actions = await listActions(c.id);
-        const pending = actions
-          .filter((a) => a.status === 'proposed')
-          .map((a) => ({ ...a, case_number: c.case_number, merchant: c.merchant_name }));
-        allPending.push(...pending);
+        try {
+          const acts = await listActions(c.id);
+          const pending = acts
+            .filter((a) => a.status === 'proposed')
+            .map((a) => ({
+              ...a,
+              case_number: c.case_number,
+              merchant: c.merchant_name,
+              requested_amount: c.requested_amount,
+            }));
+          allPending.push(...pending);
+        } catch {
+          // ignore per-case error
+        }
       }
 
       setPendingActions(allPending);
@@ -43,82 +70,183 @@ export default function ApprovalsPage() {
     }
   };
 
-  const handleDecision = async (actionId: string, decision: string) => {
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+    if (isAuthenticated) loadPending();
+  }, [isAuthenticated, authLoading, router]);
+
+  const handleDecision = async (action: ApprovalCardData, decision: 'approved' | 'rejected') => {
+    const confirmMsg =
+      decision === 'approved'
+        ? `Are you sure you want to APPROVE this consequential action for ${action.merchant}?\nThis decision is binding under case audit logs.`
+        : `Are you sure you want to REJECT this offer from ${action.merchant}?\nThis will trigger statutory escalation to the Grievance Redressal Officer (GRO).`;
+
+    if (!confirm(confirmMsg)) return;
+
+    setProcessingId(action.id);
+    const notes = decisionNotes[action.id] || '';
+
     try {
-      await approveAction(actionId, decision);
-      loadPending();
-    } catch {
-      alert('Failed to process approval');
+      await approveAction(action.id, decision, notes);
+      await loadPending();
+    } catch (err: any) {
+      alert(err.message || 'Failed to process decision');
+    } finally {
+      setProcessingId(null);
     }
   };
 
-  if (isLoading || !isAuthenticated) return null;
+  if (authLoading) return null;
 
   return (
     <>
-      <Header title="Approvals" />
+      <Header title="Approval Center" />
       <div className="page-content">
-        <div className="page-header animate-in">
-          <h2 className="page-title">Pending Approvals</h2>
-          <p className="page-subtitle">
-            Review and authorize agent-proposed actions before execution
-          </p>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Human-in-the-Loop (HITL) Approval Center</h1>
+            <p className="page-subtitle">
+              Strict governance gate: Autonomous counter-agent execution pauses whenever a financial settlement
+              offer is tendered or high-impact escalation is recommended.
+            </p>
+          </div>
         </div>
 
         {loading ? (
           <div>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="skeleton" style={{ height: 80, marginBottom: 12 }} />
+            {[1, 2].map((i) => (
+              <div key={i} className="skeleton" style={{ height: 160, marginBottom: 16 }} />
             ))}
           </div>
         ) : pendingActions.length === 0 ? (
-          <div className="card animate-in">
+          <div className="card">
             <div className="empty-state">
-              <div className="empty-state-icon">✅</div>
-              <div className="empty-state-title">All clear</div>
-              <div className="empty-state-desc">
-                No pending approvals. Actions will appear here when the agent proposes
-                consequential operations that require your authorization.
+              <div className="empty-state-icon">
+                <CheckCircle size={28} color="var(--success)" />
               </div>
+              <div className="empty-state-title">All Consequential Actions Cleared</div>
+              <div className="empty-state-desc">
+                No settlement concessions or external filings require review. When the AI agent intercepts
+                a merchant offer or proposes an escalation, it will appear here for your explicit authorization.
+              </div>
+              <Link href="/negotiations" className="btn btn-secondary btn-sm">
+                Monitor Live Negotiations →
+              </Link>
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {pendingActions.map((action) => (
-              <div key={action.id} className="card animate-in">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
-                        {action.case_number}
-                      </span>
-                      <span style={{ fontWeight: 500 }}>{action.merchant}</span>
-                      <span className="badge badge-review">pending</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {pendingActions.map((action) => {
+              let payloadObj: any = {};
+              try {
+                payloadObj = JSON.parse(action.payload);
+              } catch {
+                payloadObj = { raw: action.payload };
+              }
+
+              const offerAmt = payloadObj.offer_amount_inr || payloadObj.amount || (action.requested_amount ? action.requested_amount * 0.75 : 0);
+              const requestedAmt = action.requested_amount || 0;
+              const difference = Math.max(0, requestedAmt - offerAmt);
+
+              return (
+                <div key={action.id} className="card" style={{ borderLeft: '4px solid var(--warning)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--brand-primary-light)' }}>
+                          {action.case_number}
+                        </span>
+                        <span style={{ fontSize: 16, fontWeight: 700 }}>{action.merchant}</span>
+                        <span className="badge badge-review">Awaiting Approval</span>
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {action.action_type.replace(/_/g, ' ').toUpperCase()}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 'var(--space-1)' }}>
-                      {action.action_type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+
+                    <Link href={`/cases/${action.case_id}`} className="btn btn-ghost btn-sm">
+                      Inspect Dossier Context →
+                    </Link>
+                  </div>
+
+                  {/* Financial Comparison Metrics */}
+                  <div className="hitl-metrics-row" style={{ margin: '16px 0' }}>
+                    <div className="hitl-metric-item">
+                      <div className="hitl-metric-label">Proposed Settlement Offer</div>
+                      <div className="hitl-metric-val" style={{ color: 'var(--success)' }}>
+                        ₹{offerAmt.toLocaleString('en-IN')}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
-                      {action.payload}
+                    <div className="hitl-metric-item">
+                      <div className="hitl-metric-label">Original Claim</div>
+                      <div className="hitl-metric-val">
+                        ₹{requestedAmt.toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                    <div className="hitl-metric-item">
+                      <div className="hitl-metric-label">Haircut / Forfeited</div>
+                      <div className="hitl-metric-val" style={{ color: 'var(--warning)' }}>
+                        -₹{difference.toLocaleString('en-IN')}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleDecision(action.id, 'approved')}
-                    >
-                      ✅ Approve
-                    </button>
+
+                  {/* Legal Grounding */}
+                  <div
+                    style={{
+                      padding: 12,
+                      background: 'var(--bg-surface-raised)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 12.5,
+                      color: 'var(--text-secondary)',
+                      marginBottom: 16,
+                      border: '1px solid var(--border-subtle)',
+                    }}
+                  >
+                    <strong>Statutory Context:</strong> Consumer Protection Act, 2019 Section 2(47) & CCPA Dark Pattern Guidelines.
+                    Accepting this offer concludes negotiations and closes the claim as resolved. Rejecting this offer
+                    triggers immediate formal escalation to the company Grievance Redressal Officer (GRO) and NCH.
+                  </div>
+
+                  {/* Operator Notes Input */}
+                  <div style={{ marginBottom: 16 }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Enter optional audit remarks or instructions for the record..."
+                      value={decisionNotes[action.id] || ''}
+                      onChange={(e) =>
+                        setDecisionNotes({ ...decisionNotes, [action.id]: e.target.value })
+                      }
+                      style={{ fontSize: 13 }}
+                    />
+                  </div>
+
+                  {/* Decision Actions */}
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                     <button
                       className="btn btn-danger btn-sm"
-                      onClick={() => handleDecision(action.id, 'rejected')}
+                      onClick={() => handleDecision(action, 'rejected')}
+                      disabled={processingId === action.id}
                     >
-                      ❌ Reject
+                      <XCircle size={15} />
+                      <span>Reject & Escalate to GRO</span>
+                    </button>
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={() => handleDecision(action, 'approved')}
+                      disabled={processingId === action.id}
+                    >
+                      <CheckCircle size={15} />
+                      <span>{processingId === action.id ? 'Authorizing...' : 'Approve Settlement'}</span>
                     </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -2,27 +2,63 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import {
+  LayoutDashboard,
+  FolderKanban,
+  Bot,
+  ShieldCheck,
+  Scale,
+  AlertTriangle,
+  FileText,
+  History,
+  Settings,
+  PlusCircle,
+  CheckSquare,
+} from 'lucide-react';
 
-const NAV_SECTIONS = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: any;
+  badge?: number;
+  activeColor?: string;
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
   {
-    label: 'Overview',
+    label: 'Command & Dossiers',
     items: [
-      { href: '/', icon: '📊', label: 'Dashboard' },
-      { href: '/cases', icon: '📁', label: 'All Cases' },
+      { href: '/', label: 'Overview', icon: LayoutDashboard },
+      { href: '/cases', label: 'Dispute Dossiers', icon: FolderKanban },
+      { href: '/cases/new', label: 'New Dossier Intake', icon: PlusCircle },
     ],
   },
   {
-    label: 'Actions',
+    label: 'Autonomous Ops',
     items: [
-      { href: '/cases/new', icon: '➕', label: 'New Dispute' },
-      { href: '/approvals', icon: '✅', label: 'Approvals', badge: 0 },
+      { href: '/negotiations', label: 'Live Negotiations', icon: Bot },
+      { href: '/approvals', label: 'Approval Center', icon: CheckSquare },
+      { href: '/evidence', label: 'Evidence Vault', icon: ShieldCheck },
     ],
   },
   {
-    label: 'System',
+    label: 'Statutory & Escalation',
     items: [
-      { href: '/escalations', icon: '🚨', label: 'Escalations' },
-      { href: '/audit', icon: '📋', label: 'Audit Log' },
+      { href: '/legal-research', label: 'Legal Research', icon: Scale },
+      { href: '/escalations', label: 'Escalations', icon: AlertTriangle },
+      { href: '/documents', label: 'Document Generator', icon: FileText },
+    ],
+  },
+  {
+    label: 'Compliance',
+    items: [
+      { href: '/audit', label: 'Audit Trail', icon: History },
+      { href: '/settings', label: 'Settings', icon: Settings },
     ],
   },
 ];
@@ -32,35 +68,39 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Brand */}
+      {/* Brand Header */}
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">G</div>
+        <div className="sidebar-brand-icon">
+          <Bot size={22} />
+        </div>
         <div>
-          <div className="sidebar-brand-text">Garuda AI</div>
-          <div className="sidebar-brand-version">PS 30 · v0.1.0</div>
+          <div className="sidebar-brand-text">PS 30 Counter-Agent</div>
+          <div className="sidebar-brand-version">Consumer Legal-Tech AI</div>
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation Sections */}
       <nav className="sidebar-nav">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
             <div className="sidebar-section-label">{section.label}</div>
             {section.items.map((item) => {
+              const Icon = item.icon;
               const isActive =
                 item.href === '/'
                   ? pathname === '/'
-                  : pathname.startsWith(item.href);
+                  : pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href) && item.href !== '/cases/new');
+
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={`nav-item ${isActive ? 'active' : ''}`}
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <Icon size={18} />
                   <span>{item.label}</span>
                   {item.badge !== undefined && item.badge > 0 && (
-                    <span className="nav-badge">{item.badge}</span>
+                    <span className="nav-badge active-badge">{item.badge}</span>
                   )}
                 </Link>
               );
@@ -69,14 +109,10 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div style={{
-        padding: 'var(--space-4) var(--space-6)',
-        borderTop: '1px solid var(--border-subtle)',
-        fontSize: '11px',
-        color: 'var(--text-muted)',
-      }}>
-        Consumer Dispute Platform
+      {/* Footer Info */}
+      <div className="sidebar-footer">
+        <span>Grounded on CPA 2019 & CCPA</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>v1.2.0</span>
       </div>
     </aside>
   );

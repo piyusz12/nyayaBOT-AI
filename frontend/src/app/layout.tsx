@@ -2,14 +2,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth-context';
 import Sidebar from '@/components/Sidebar';
+import React, { Suspense } from 'react';
 
 export const metadata: Metadata = {
-  title: 'Garuda AI — Consumer Dispute Platform',
+  title: 'PS 30 Counter-Agent — Consumer Dispute Resolution Platform',
   description:
-    'AI-powered consumer dispute resolution platform. File disputes, track cases, collect evidence, and escalate to resolution.',
+    'AI-powered consumer dispute resolution and counter-agent escalation platform. Create dispute dossiers, upload evidence, monitor live multi-agent negotiations, identify dark patterns, and prepare statutory escalations.',
 };
-
-import React, { Suspense } from 'react';
 
 export default function RootLayout({
   children,
@@ -25,7 +24,7 @@ export default function RootLayout({
               <Sidebar />
             </Suspense>
             <main className="main-content">
-              <Suspense fallback={<div className="p-8">Loading...</div>}>
+              <Suspense fallback={<div className="page-content">Loading...</div>}>
                 {children}
               </Suspense>
             </main>

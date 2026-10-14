@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login, register } from '@/lib/api';
+import { login, register, setToken } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { Bot, Shield, ArrowRight, Lock, Mail, User } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +29,30 @@ export default function LoginPage() {
       checkAuth();
       router.push('/');
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      setError(err.message || 'Authentication failed. Please verify credentials or try Demo Mode.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    setError('');
+    // Try to register demo user if not exists or log in
+    try {
+      try {
+        await register('operator@ps30.internal', 'Password123!', 'Lead Dispute Officer');
+      } catch {
+        // already registered, proceed to login
+      }
+      await login('operator@ps30.internal', 'Password123!');
+      checkAuth();
+      router.push('/');
+    } catch (err: any) {
+      // If backend is offline or fails, grant local demo token
+      setToken('demo-operator-token-ps30');
+      checkAuth();
+      router.push('/');
     } finally {
       setLoading(false);
     }
@@ -42,92 +66,94 @@ export default function LoginPage() {
         justifyContent: 'center',
         minHeight: '100vh',
         marginLeft: 'calc(-1 * var(--sidebar-width))',
+        background: 'var(--bg-root)',
         position: 'relative',
         zIndex: 200,
-        background: 'var(--bg-root)',
+        padding: 20,
       }}
     >
-      {/* Ambient glow */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '10%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 600,
-          height: 400,
-          background:
-            'radial-gradient(ellipse, rgba(99, 102, 241, 0.12) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }}
-      />
-
       <div
         className="card"
         style={{
           width: '100%',
-          maxWidth: 420,
+          maxWidth: 440,
           padding: 'var(--space-8)',
-          position: 'relative',
+          boxShadow: 'var(--shadow-lg)',
+          border: '1px solid var(--border-default)',
         }}
       >
-        {/* Logo */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: 'var(--space-8)',
-          }}
-        >
+        {/* Brand Logo & Title */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div
             style={{
-              width: 56,
-              height: 56,
-              background: 'var(--gradient-primary)',
+              width: 52,
+              height: 52,
+              background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)',
               borderRadius: 'var(--radius-lg)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 24,
-              fontWeight: 800,
               color: 'white',
-              margin: '0 auto var(--space-4)',
-              boxShadow: '0 0 32px rgba(99, 102, 241, 0.3)',
+              margin: '0 auto 14px',
+              boxShadow: '0 0 24px rgba(14, 165, 233, 0.4)',
             }}
           >
-            G
+            <Bot size={28} />
           </div>
-          <h1
-            style={{
-              fontSize: 24,
-              fontWeight: 700,
-              letterSpacing: '-0.03em',
-              marginBottom: 4,
-            }}
-          >
-            {isRegister ? 'Create Account' : 'Welcome Back'}
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 4 }}>
+            PS 30 Counter-Agent
           </h1>
-          <p
-            style={{
-              fontSize: 14,
-              color: 'var(--text-secondary)',
-            }}
-          >
-            {isRegister
-              ? 'Join Garuda AI to resolve your disputes'
-              : 'Sign in to your dispute platform'}
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Consumer Dispute Resolution & Legal-Tech Operations
           </p>
         </div>
 
-        {/* Error */}
+        {/* Demo Fast Access Button */}
+        <div style={{ marginBottom: 20 }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleDemoLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              justifyContent: 'center',
+              border: '1px solid var(--border-hover)',
+              background: 'rgba(14, 165, 233, 0.08)',
+              color: 'var(--brand-primary-light)',
+            }}
+          >
+            <Shield size={15} />
+            <span>⚡ One-Click Operator Sign In (Demo Mode)</span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            margin: '16px 0',
+            color: 'var(--text-muted)',
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+          }}
+        >
+          <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+          <span>or sign in with credentials</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+        </div>
+
         {error && (
           <div
             style={{
               background: 'var(--error-bg)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
+              border: '1px solid var(--error-border)',
               borderRadius: 'var(--radius-md)',
-              padding: 'var(--space-3) var(--space-4)',
-              marginBottom: 'var(--space-5)',
-              fontSize: 13,
+              padding: '10px 14px',
+              marginBottom: 16,
+              fontSize: 12.5,
               color: 'var(--error)',
             }}
           >
@@ -135,71 +161,72 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit}>
           {isRegister && (
             <div className="form-group">
               <label className="form-label">Full Name</label>
-              <input
-                className="form-input"
-                type="text"
-                placeholder="Enter your full name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="e.g. Adv. Priya Sharma"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  style={{ paddingLeft: 34 }}
+                />
+                <User size={15} style={{ position: 'absolute', left: 11, top: 12, color: 'var(--text-muted)' }} />
+              </div>
             </div>
           )}
 
           <div className="form-group">
-            <label className="form-label">Email</label>
-            <input
-              className="form-input"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <label className="form-label">Email Address</label>
+            <div style={{ position: 'relative' }}>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="operator@ps30.internal"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{ paddingLeft: 34 }}
+              />
+              <Mail size={15} style={{ position: 'absolute', left: 11, top: 12, color: 'var(--text-muted)' }} />
+            </div>
           </div>
 
           <div className="form-group">
             <label className="form-label">Password</label>
-            <input
-              className="form-input"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                className="form-input"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                style={{ paddingLeft: 34 }}
+              />
+              <Lock size={15} style={{ position: 'absolute', left: 11, top: 12, color: 'var(--text-muted)' }} />
+            </div>
           </div>
 
           <button
             type="submit"
-            className="btn btn-primary btn-lg"
+            className="btn btn-primary"
             disabled={loading}
-            style={{ width: '100%', marginTop: 'var(--space-4)' }}
+            style={{ width: '100%', marginTop: 12, justifyContent: 'center' }}
           >
-            {loading
-              ? '⏳ Please wait...'
-              : isRegister
-              ? '🚀 Create Account'
-              : '🔐 Sign In'}
+            <span>{loading ? 'Authenticating...' : isRegister ? 'Create Account' : 'Sign In'}</span>
+            <ArrowRight size={15} />
           </button>
         </form>
 
-        {/* Toggle */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginTop: 'var(--space-6)',
-            fontSize: 13,
-            color: 'var(--text-secondary)',
-          }}
-        >
-          {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
+        <div style={{ textAlign: 'center', marginTop: 18, fontSize: 13, color: 'var(--text-secondary)' }}>
+          {isRegister ? 'Already registered?' : 'Need an account?'}{' '}
           <button
+            type="button"
             onClick={() => {
               setIsRegister(!isRegister);
               setError('');
@@ -207,14 +234,12 @@ export default function LoginPage() {
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-accent)',
+              color: 'var(--brand-primary-light)',
               cursor: 'pointer',
               fontWeight: 600,
-              fontFamily: 'var(--font-sans)',
-              fontSize: 13,
             }}
           >
-            {isRegister ? 'Sign In' : 'Register'}
+            {isRegister ? 'Sign In' : 'Register Operator'}
           </button>
         </div>
       </div>
