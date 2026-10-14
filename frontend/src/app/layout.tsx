@@ -5,9 +5,13 @@ import Sidebar from '@/components/Sidebar';
 import React, { Suspense } from 'react';
 
 export const metadata: Metadata = {
-  title: 'PS 30 Counter-Agent — Consumer Dispute Resolution Platform',
+  title: 'NyayaBot — AI Consumer Dispute Resolution Platform',
   description:
-    'AI-powered consumer dispute resolution and counter-agent escalation platform. Create dispute dossiers, upload evidence, monitor live multi-agent negotiations, identify dark patterns, and prepare statutory escalations.',
+    'NyayaBot: Autonomous legal counter-agent fighting unfair merchant practices, dark patterns, and unauthorized charges under CPA 2019 and CCPA guidelines.',
+  icons: {
+    icon: '/nyayabot-icon-dark.png',
+    apple: '/nyayabot-icon-dark.png',
+  },
 };
 
 export default function RootLayout({

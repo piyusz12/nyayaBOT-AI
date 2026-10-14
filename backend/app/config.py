@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     """Central configuration for the Garuda AI backend."""
 
     # ── Application ──────────────────────────────────────────────────
-    APP_NAME: str = "PS 30 Counter-Agent — Consumer Dispute Platform"
+    APP_NAME: str = "NyayaBot — Consumer Dispute Platform"
     APP_VERSION: str = "0.1.0"
     DEBUG: bool = True
 

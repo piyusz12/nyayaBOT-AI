@@ -10,10 +10,12 @@ import {
   subscribeSessionStream,
   submitHitlDecision,
   triggerKillswitch,
+  executeBotTurn,
   type CaseSummary,
   type NegotiationMessage,
   type AgentNodeEvent,
   type HitlPendingData,
+  type BotTurnResponse,
 } from '@/lib/api';
 import {
   Bot,
@@ -31,6 +33,10 @@ import {
   UserCheck,
   ChevronRight,
   Flame,
+  Sparkles,
+  Copy,
+  Cpu,
+  Zap,
 } from 'lucide-react';
 
 interface AgentNodeState {
@@ -122,6 +128,13 @@ export default function LiveNegotiationConsole() {
   const [isConnected, setIsConnected] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Local AI Playground state
+  const [playgroundModel, setPlaygroundModel] = useState<string>('llama3.2:latest');
+  const [customMerchantInput, setCustomMerchantInput] = useState<string>('');
+  const [isGeneratingTurn, setIsGeneratingTurn] = useState<boolean>(false);
+  const [botTurnResult, setBotTurnResult] = useState<BotTurnResponse | null>(null);
+  const [copiedResponse, setCopiedResponse] = useState<boolean>(false);
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const cleanupStreamRef = useRef<(() => void) | null>(null);
@@ -297,6 +310,58 @@ export default function LiveNegotiationConsole() {
     }
   };
 
+  // Generate bot turn with local AI
+  const handleGenerateBotTurn = async (presetText?: string) => {
+    const inputMsg = presetText !== undefined ? presetText : customMerchantInput;
+    if (!inputMsg.trim()) return;
+    if (presetText !== undefined) {
+      setCustomMerchantInput(presetText);
+    }
+    setIsGeneratingTurn(true);
+    setCopiedResponse(false);
+    try {
+      const res = await executeBotTurn({
+        merchant_message: inputMsg,
+        merchant_name: selectedCase?.merchant_name || 'Merchant',
+        requested_amount_inr: selectedCase?.requested_amount || 2499.0,
+        model: playgroundModel,
+      });
+      setBotTurnResult(res);
+    } catch (err: any) {
+      alert(err.message || 'Failed to generate bot turn');
+    } finally {
+      setIsGeneratingTurn(false);
+    }
+  };
+
+  // Inject generated response into the active transcript
+  const handleInjectIntoTranscript = () => {
+    if (!botTurnResult) return;
+    const merchantMsgText = customMerchantInput.trim() || 'Merchant statement received';
+    const newMerchantMsg: NegotiationMessage = {
+      id: `merchant-${Date.now()}`,
+      sender: 'merchant',
+      sender_label: `${selectedCase?.merchant_name || 'Merchant'} Support Bot`,
+      content: merchantMsgText,
+      timestamp: new Date().toISOString(),
+    };
+    const newAgentMsg: NegotiationMessage = {
+      id: `agent-${Date.now()}`,
+      sender: 'agent',
+      sender_label: `NyayaBot AI (${botTurnResult.model_used})`,
+      content: botTurnResult.response_text,
+      timestamp: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, newMerchantMsg, newAgentMsg]);
+    setTurnCount((prev) => prev + 1);
+    if (botTurnResult.detected_dark_patterns?.length) {
+      setDetectedDarkPatterns((prev) => Array.from(new Set([...prev, ...botTurnResult.detected_dark_patterns])));
+    }
+    if (botTurnResult.statutory_citations?.length) {
+      setActiveStatutes((prev) => Array.from(new Set([...prev, ...botTurnResult.statutory_citations])));
+    }
+  };
+
   return (
     <>
       <Header title="Live AI Negotiation Console" />
@@ -349,6 +414,26 @@ export default function LiveNegotiationConsole() {
             >
               ● {sessionStatus}
             </span>
+
+            {/* Local AI Engine Badge */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 10px',
+                borderRadius: 'var(--radius-full)',
+                background: 'rgba(20, 184, 166, 0.12)',
+                border: '1px solid rgba(20, 184, 166, 0.3)',
+                fontSize: 12,
+                color: 'var(--teal)',
+                fontWeight: 600,
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--teal)', display: 'inline-block' }} />
+              <Cpu size={13} />
+              <span>Local AI Engine: Llama 3.2 (Offline & Private)</span>
+            </div>
 
             {/* Start / Restart */}
             <button
@@ -720,7 +805,242 @@ export default function LiveNegotiationConsole() {
             </div>
           </div>
         </div>
+
+        {/* ── NyayaBot Local AI Playground ── */}
+        <div
+          className="card"
+          style={{
+            marginTop: 'var(--space-4)',
+            background: 'linear-gradient(135deg, rgba(20, 184, 166, 0.05) 0%, rgba(10, 28, 62, 0.4) 100%)',
+            border: '1px solid rgba(20, 184, 166, 0.25)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              borderBottom: '1px solid var(--border-subtle)',
+              paddingBottom: 12,
+              marginBottom: 16,
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 8,
+                  background: 'rgba(20, 184, 166, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--teal)',
+                }}
+              >
+                <Sparkles size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
+                  NyayaBot Local AI Playground & Live Counter-Agent
+                </h3>
+                <p style={{ fontSize: 12, margin: 0, color: 'var(--text-muted)' }}>
+                  Test corporate chatbot deflection patterns with local Ollama models (offline, zero-cloud, 100% private)
+                </p>
+              </div>
+            </div>
+
+            {/* Model Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                Active Model:
+              </span>
+              <select
+                className="form-select"
+                value={playgroundModel}
+                onChange={(e) => setPlaygroundModel(e.target.value)}
+                style={{ width: 230, fontSize: 12, padding: '6px 10px' }}
+              >
+                <option value="llama3.2:latest">Llama 3.2 3B (Fast & Precise)</option>
+                <option value="llama3.1:latest">Llama 3.1 8B (Deep Grounding)</option>
+                <option value="deepseek-r1:8b">DeepSeek-R1 8B (Reasoning)</option>
+                <option value="qwen2.5-coder:7b">Qwen 2.5 Coder 7B</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quick presets */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+              Quick Scenario Presets:
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: 12 }}
+                onClick={() => handleGenerateBotTurn('Our strict company policy states that all subscription payments are non-refundable once billed.')}
+              >
+                1. Non-Refundable Policy Refusal
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: 12 }}
+                onClick={() => handleGenerateBotTurn('You cannot cancel online. Per our terms, you must call our telephone customer care helpline between 10am-4pm.')}
+              >
+                2. Forced Phone Call Trap
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: 12 }}
+                onClick={() => handleGenerateBotTurn('We cannot process bank refunds, but we can offer you 200 reward wallet points or a ₹300 voucher.')}
+              >
+                3. Forced Credit / Coupon
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: 12 }}
+                onClick={() => handleGenerateBotTurn('The dispute window of 48 hours has expired. No further compensation can be provided.')}
+              >
+                4. Arbitrary Time Limit Window
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Input */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Or type/paste any real merchant chatbot deflection message here..."
+              value={customMerchantInput}
+              onChange={(e) => setCustomMerchantInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleGenerateBotTurn();
+                }
+              }}
+              style={{ flex: 1, fontSize: 13 }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={() => handleGenerateBotTurn()}
+              disabled={isGeneratingTurn || !customMerchantInput.trim()}
+              style={{ minWidth: 160 }}
+            >
+              {isGeneratingTurn ? (
+                <>
+                  <Zap size={14} className="animate-spin" />
+                  <span>Thinking (Local AI)...</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={14} />
+                  <span>Generate Counter</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Response Display */}
+          {botTurnResult && (
+            <div
+              style={{
+                background: 'var(--bg-surface-raised)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 'var(--radius-md)',
+                padding: '14px 16px',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="badge badge-active" style={{ fontSize: 11 }}>
+                    ⚡ {botTurnResult.model_used}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    Generated in {botTurnResult.latency_ms}ms (Offline Local AI)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    style={{ fontSize: 12 }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(botTurnResult.response_text);
+                      setCopiedResponse(true);
+                      setTimeout(() => setCopiedResponse(false), 2000);
+                    }}
+                  >
+                    <Copy size={12} />
+                    <span>{copiedResponse ? 'Copied!' : 'Copy Rebuttal'}</span>
+                  </button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    style={{ fontSize: 12 }}
+                    onClick={handleInjectIntoTranscript}
+                  >
+                    <Play size={12} />
+                    <span>Add to Live Transcript</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Counter text */}
+              <div
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  color: 'var(--text-primary)',
+                  fontWeight: 500,
+                  padding: '10px 14px',
+                  background: 'rgba(20, 184, 166, 0.08)',
+                  borderRadius: 6,
+                  borderLeft: '3px solid var(--teal)',
+                  marginBottom: 12,
+                }}
+              >
+                {botTurnResult.response_text}
+              </div>
+
+              {/* Detected violations and statutes */}
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12 }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Detected Violations: </span>
+                  {botTurnResult.detected_dark_patterns.map((p, idx) => (
+                    <span key={idx} className="badge badge-escalated" style={{ marginLeft: 6, fontSize: 11 }}>
+                      {p}
+                    </span>
+                  ))}
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Statutory Basis: </span>
+                  {botTurnResult.statutory_citations.map((s, idx) => (
+                    <span key={idx} className="badge badge-review" style={{ marginLeft: 6, fontSize: 11 }}>
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );
 }
+

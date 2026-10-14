@@ -164,6 +164,21 @@ class TestPS30Endpoints(unittest.TestCase):
         )
         self.assertEqual(dup_resp.status_code, 409)
 
+    def test_09_bot_turn_endpoint(self):
+        resp = self.client.post("/api/v1/sessions/bot-turn", json={
+            "merchant_message": "Our strict policy states subscription charges are final and non-refundable.",
+            "merchant_name": "CloudStream",
+            "requested_amount_inr": 2499.0,
+        })
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("response_text", data)
+        self.assertIn("detected_dark_patterns", data)
+        self.assertIn("statutory_citations", data)
+        self.assertIn("model_used", data)
+        self.assertTrue(len(data["response_text"]) > 20)
+
 
 if __name__ == "__main__":
     unittest.main()
+

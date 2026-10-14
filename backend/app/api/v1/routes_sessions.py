@@ -232,3 +232,30 @@ def trigger_killswitch_endpoint(
         "channel": esc_res["channel"],
         "timestamp": esc_res["submitted_at"],
     }
+
+
+class BotTurnRequest(BaseModel):
+    merchant_message: str = Field(..., description="The message from the merchant or customer dispute scenario")
+    merchant_name: Optional[str] = "Merchant"
+    requested_amount_inr: Optional[float] = 2499.0
+    resolution_floor_inr: Optional[float] = None
+    latest_offer_inr: Optional[float] = None
+    dispute_type: Optional[str] = "subscription_trap"
+    model: Optional[str] = None
+
+
+@router.post("/bot-turn")
+def execute_bot_turn_endpoint(payload: BotTurnRequest):
+    """Execute interactive dispute turn with the best local AI model in NyayaBot."""
+    from app.agent.local_llm import generate_bot_dispute_turn
+
+    return generate_bot_dispute_turn(
+        merchant_message=payload.merchant_message,
+        merchant_name=payload.merchant_name or "Merchant",
+        requested_amount_inr=payload.requested_amount_inr or 2499.0,
+        resolution_floor_inr=payload.resolution_floor_inr,
+        latest_offer_inr=payload.latest_offer_inr,
+        dispute_type=payload.dispute_type or "subscription_trap",
+        preferred_model=payload.model,
+    )
+

@@ -88,25 +88,41 @@ export default function LoginPage() {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div
             style={{
-              width: 52,
-              height: 52,
-              background: 'linear-gradient(135deg, #0284c7 0%, #0ea5e9 100%)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'white',
-              margin: '0 auto 14px',
-              boxShadow: '0 0 24px rgba(14, 165, 233, 0.4)',
+              padding: '14px 22px',
+              borderRadius: '16px',
+              background: 'rgba(15, 23, 42, 0.75)',
+              border: '1px solid rgba(20, 184, 166, 0.3)',
+              boxShadow: '0 0 32px rgba(20, 184, 166, 0.2)',
+              margin: '0 auto 16px',
             }}
           >
-            <Bot size={28} />
+            <img
+              src="/nyayabot-logo-dark.png"
+              alt="NyayaBot Logo"
+              style={{
+                height: 48,
+                maxWidth: 240,
+                objectFit: 'contain',
+                display: 'block',
+              }}
+            />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', marginBottom: 4 }}>
-            PS 30 Counter-Agent
+          <h1
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              color: 'var(--text-primary)',
+              marginBottom: 4,
+            }}
+          >
+            Nyaya<span style={{ color: '#14B8A6' }}>Bot</span>
           </h1>
           <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-            Consumer Dispute Resolution & Legal-Tech Operations
+            AI Counter-Agent for Consumer Disputes & Statutory Escalations
           </p>
         </div>
 

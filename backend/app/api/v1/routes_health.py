@@ -29,3 +29,21 @@ def get_v1_health(db: Session = Depends(get_db)):
         "database_connected": db_ok,
         "environment": "development" if settings.DEBUG else "production",
     }
+
+
+@router.get("/health/models")
+def get_local_models_status():
+    """Diagnostic endpoint reporting local AI model availability and Ollama status."""
+    from app.agent.local_llm import check_ollama_available, get_available_local_models, DEFAULT_LOCAL_MODEL
+
+    online = check_ollama_available()
+    models = get_available_local_models() if online else []
+
+    return {
+        "ollama_online": online,
+        "default_model": DEFAULT_LOCAL_MODEL,
+        "active_engine": f"Local AI ({DEFAULT_LOCAL_MODEL})" if online else "Deterministic Statutory Engine",
+        "total_local_models": len(models),
+        "installed_models": models,
+        "recommended_for_legal_counter_agent": "llama3.1:latest" if any("llama3.1" in m["name"] for m in models) else DEFAULT_LOCAL_MODEL,
+    }

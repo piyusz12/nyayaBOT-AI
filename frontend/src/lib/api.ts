@@ -591,3 +591,54 @@ export interface AuditItem {
 export async function getAuditTrail(caseId: string): Promise<AuditItem[]> {
   return apiFetch<AuditItem[]>(`/api/audit/${caseId}`);
 }
+
+// ── Local AI Model & Bot Turn ─────────────────────────────────────────
+export interface LocalModelInfo {
+  name: string;
+  size_mb: number;
+  family: string;
+  parameter_size: string;
+}
+
+export interface LocalModelsStatus {
+  ollama_online: boolean;
+  default_model: string;
+  active_engine: string;
+  total_local_models: number;
+  installed_models: LocalModelInfo[];
+  recommended_for_legal_counter_agent: string;
+}
+
+export interface BotTurnResponse {
+  response_text: string;
+  model_used: string;
+  latency_ms: number;
+  detected_dark_patterns: string[];
+  statutory_citations: string[];
+  restitution_demanded_inr: number;
+  resolution_floor_inr: number;
+  detected_offer_inr: number | null;
+  recommended_next_action: string;
+  strategic_advice: string;
+  is_local_ai: boolean;
+}
+
+export async function getLocalModelsStatus(): Promise<LocalModelsStatus> {
+  return apiFetch<LocalModelsStatus>('/api/v1/health/models');
+}
+
+export async function executeBotTurn(payload: {
+  merchant_message: string;
+  merchant_name?: string;
+  requested_amount_inr?: number;
+  resolution_floor_inr?: number;
+  latest_offer_inr?: number;
+  dispute_type?: string;
+  model?: string;
+}): Promise<BotTurnResponse> {
+  return apiFetch<BotTurnResponse>('/api/v1/sessions/bot-turn', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+

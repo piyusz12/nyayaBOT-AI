@@ -20,12 +20,14 @@
   --border-hover: rgba(56, 189, 248, 0.45);
   --border-focus: rgba(14, 165, 233, 0.65);
 
-  /* Primary Brand & Accents (Restrained Cyan & Trustworthy Blue) */
-  --brand-primary: #0ea5e9;
-  --brand-primary-light: #38bdf8;
-  --brand-primary-dark: #0284c7;
-  --brand-blue: #2563eb;
-  --brand-blue-light: #60a5fa;
+  /* Primary Brand & Accents (NyayaBot Teal, Navy & Gold) */
+  --brand-primary: #14b8a6;
+  --brand-primary-light: #2dd4bf;
+  --brand-primary-dark: #0f766e;
+  --brand-blue: #0284c7;
+  --brand-blue-light: #38bdf8;
+  --brand-gold: #f5a623;
+  --brand-gold-light: #fbbf24;
 
   /* Semantic Feedback Tokens */
   --success: #10b981;

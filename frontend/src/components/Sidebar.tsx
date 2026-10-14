@@ -70,15 +70,58 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <Bot size={22} />
-        </div>
+      <Link
+        href="/"
+        className="sidebar-brand"
+        style={{
+          textDecoration: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          padding: '12px 14px',
+          borderRadius: '10px',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        <img
+          src="/nyayabot-icon-dark.png"
+          alt="NyayaBot"
+          style={{
+            width: 38,
+            height: 38,
+            objectFit: 'contain',
+            borderRadius: '8px',
+            filter: 'drop-shadow(0 0 10px rgba(20, 184, 166, 0.4))',
+          }}
+        />
         <div>
-          <div className="sidebar-brand-text">PS 30 Counter-Agent</div>
-          <div className="sidebar-brand-version">Consumer Legal-Tech AI</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: '#F8FAFC' }}>
+              Nyaya
+            </span>
+            <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: '#14B8A6' }}>
+              Bot
+            </span>
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                padding: '1px 5px',
+                marginLeft: 5,
+                borderRadius: 4,
+                background: 'rgba(20, 184, 166, 0.15)',
+                color: '#2DD4BF',
+                border: '1px solid rgba(20, 184, 166, 0.35)',
+              }}
+            >
+              AI
+            </span>
+          </div>
+          <div className="sidebar-brand-version" style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            Consumer Legal Counter-Agent
+          </div>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation Sections */}
       <nav className="sidebar-nav">

@@ -62,8 +62,17 @@ export default function Header({ title }: HeaderProps) {
       {/* Left: Breadcrumbs & Title */}
       <div className="header-left">
         <nav className="breadcrumbs" aria-label="Breadcrumb">
-          <Link href="/" className="breadcrumbs-item">
-            PS 30
+          <Link
+            href="/"
+            className="breadcrumbs-item"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <img
+              src="/nyayabot-icon-dark.png"
+              alt="NyayaBot"
+              style={{ width: 16, height: 16, objectFit: 'contain' }}
+            />
+            <span style={{ fontWeight: 700 }}>NyayaBot</span>
           </Link>
           {breadcrumbItems.map((item, idx) => (
             <span key={item.url} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>

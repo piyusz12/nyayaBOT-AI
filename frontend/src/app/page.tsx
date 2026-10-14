@@ -132,6 +132,28 @@ export default function ExecutiveDashboard() {
         {/* Page Header */}
         <div className="page-header">
           <div>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 10px',
+                borderRadius: '6px',
+                background: 'rgba(20, 184, 166, 0.12)',
+                border: '1px solid rgba(20, 184, 166, 0.3)',
+                color: '#2DD4BF',
+                fontSize: 11,
+                fontWeight: 600,
+                marginBottom: 8,
+              }}
+            >
+              <img
+                src="/nyayabot-icon-dark.png"
+                alt="NyayaBot"
+                style={{ width: 14, height: 14, objectFit: 'contain' }}
+              />
+              <span>NyayaBot Autonomous Legal Defense Engine</span>
+            </div>
             <h1 className="page-title">Executive Command Dashboard</h1>
             <p className="page-subtitle">
               Real-time monitoring of consumer dispute dossiers, multi-agent merchant negotiations,

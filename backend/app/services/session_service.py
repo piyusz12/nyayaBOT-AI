@@ -19,6 +19,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.agent.graph import negotiation_graph
+from app.agent.local_llm import generate_adversarial_counter_response
 from app.core.exceptions import NotFoundError
 from app.models import Case, Checkpoint, Conversation, Dossier, Message, User
 from app.services.audit_service import log_event
@@ -198,19 +199,14 @@ async def generate_sse_events(
 
     # 4. Node 3: Dialogue Generation
     session["current_node"] = "dialogue_generator"
-    proposed_rebuttal = (
-        f"Under Section 2(47) of the Consumer Protection Act, 2019 and Annexure I(5) of the CCPA Dark Pattern Guidelines, "
-        f"categorical 'non-refundable' clauses for digital subscriptions with automated renewals constitute prohibited unfair trade practices. "
-        f"We reject the 30-day trial offer and reiterate the demand for immediate restitution of INR {session['requested_amount_inr']:,.2f} "
-        f"and confirmation of e-mandate revocation."
-    )
+    proposed_rebuttal = generate_adversarial_counter_response(session)
     event_dialogue = {
         "type": "agent_node_transition",
         "node": "dialogue_generator",
         "title": "Dialogue Generation",
         "status": "EXECUTING",
         "proposed_response": proposed_rebuttal,
-        "description": "Constructed statutory counter-argument demanding monetary refund and mandate revocation.",
+        "description": f"Synthesized counter-argument asserting restitution of INR {session['requested_amount_inr']:,.2f} using local AI.",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     yield f"event: node_transition\ndata: {json.dumps(event_dialogue)}\n\n"
@@ -238,7 +234,7 @@ async def generate_sse_events(
     msg2 = {
         "id": str(uuid.uuid4()),
         "sender": "agent",
-        "sender_label": "PS 30 Counter-Agent",
+        "sender_label": "NyayaBot AI Counter-Agent (Local Llama 3.2)",
         "content": proposed_rebuttal,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
