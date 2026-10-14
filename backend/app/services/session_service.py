@@ -199,7 +199,7 @@ async def generate_sse_events(
 
     # 4. Node 3: Dialogue Generation
     session["current_node"] = "dialogue_generator"
-    proposed_rebuttal = generate_adversarial_counter_response(session)
+    proposed_rebuttal = await asyncio.to_thread(generate_adversarial_counter_response, session)
     event_dialogue = {
         "type": "agent_node_transition",
         "node": "dialogue_generator",

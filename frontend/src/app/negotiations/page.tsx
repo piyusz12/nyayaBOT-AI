@@ -131,8 +131,12 @@ export default function LiveNegotiationConsole() {
 
   // Local AI Playground state
   const [playgroundModel, setPlaygroundModel] = useState<string>('llama3.2:latest');
-  const [customMerchantInput, setCustomMerchantInput] = useState<string>('');
+  const [customMerchantInput, setCustomMerchantInput] = useState<string>(
+    'Our strict company policy states that all subscription payments are non-refundable once billed.'
+  );
   const [isGeneratingTurn, setIsGeneratingTurn] = useState<boolean>(false);
+  const [turnElapsedSec, setTurnElapsedSec] = useState<number>(0);
+  const [turnError, setTurnError] = useState<string | null>(null);
   const [botTurnResult, setBotTurnResult] = useState<BotTurnResponse | null>(null);
   const [copiedResponse, setCopiedResponse] = useState<boolean>(false);
 
@@ -312,13 +316,18 @@ export default function LiveNegotiationConsole() {
 
   // Generate bot turn with local AI
   const handleGenerateBotTurn = async (presetText?: string) => {
-    const inputMsg = presetText !== undefined ? presetText : customMerchantInput;
-    if (!inputMsg.trim()) return;
-    if (presetText !== undefined) {
-      setCustomMerchantInput(presetText);
-    }
+    const defaultMsg = 'Our strict company policy states that all subscription payments are non-refundable once billed.';
+    const inputMsg = (presetText !== undefined ? presetText : customMerchantInput).trim() || defaultMsg;
+    setCustomMerchantInput(inputMsg);
     setIsGeneratingTurn(true);
+    setTurnError(null);
     setCopiedResponse(false);
+    setTurnElapsedSec(0);
+
+    const timer = setInterval(() => {
+      setTurnElapsedSec((prev) => +(prev + 0.5).toFixed(1));
+    }, 500);
+
     try {
       const res = await executeBotTurn({
         merchant_message: inputMsg,
@@ -328,8 +337,9 @@ export default function LiveNegotiationConsole() {
       });
       setBotTurnResult(res);
     } catch (err: any) {
-      alert(err.message || 'Failed to generate bot turn');
+      setTurnError(err.message || 'Failed to generate bot turn. Ensure Ollama is running on port 11434.');
     } finally {
+      clearInterval(timer);
       setIsGeneratingTurn(false);
     }
   };
@@ -863,12 +873,12 @@ export default function LiveNegotiationConsole() {
                 className="form-select"
                 value={playgroundModel}
                 onChange={(e) => setPlaygroundModel(e.target.value)}
-                style={{ width: 230, fontSize: 12, padding: '6px 10px' }}
+                style={{ width: 280, fontSize: 12, padding: '6px 10px' }}
               >
-                <option value="llama3.2:latest">Llama 3.2 3B (Fast & Precise)</option>
-                <option value="llama3.1:latest">Llama 3.1 8B (Deep Grounding)</option>
-                <option value="deepseek-r1:8b">DeepSeek-R1 8B (Reasoning)</option>
-                <option value="qwen2.5-coder:7b">Qwen 2.5 Coder 7B</option>
+                <option value="llama3.2:latest">⚡ Llama 3.2 3B (Fastest & Warm in VRAM — Recommended)</option>
+                <option value="llama3.1:latest">Llama 3.1 8B (Deep Grounding — ~40s cold load)</option>
+                <option value="deepseek-r1:8b">DeepSeek-R1 8B (Reasoning — ~45s cold load)</option>
+                <option value="qwen2.5-coder:7b">Qwen 2.5 Coder 7B (40s cold load)</option>
               </select>
             </div>
           </div>
@@ -883,7 +893,11 @@ export default function LiveNegotiationConsole() {
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: 12 }}
-                onClick={() => handleGenerateBotTurn('Our strict company policy states that all subscription payments are non-refundable once billed.')}
+                onClick={() => {
+                  const text = 'Our strict company policy states that all subscription payments are non-refundable once billed.';
+                  setCustomMerchantInput(text);
+                  handleGenerateBotTurn(text);
+                }}
               >
                 1. Non-Refundable Policy Refusal
               </button>
@@ -891,7 +905,11 @@ export default function LiveNegotiationConsole() {
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: 12 }}
-                onClick={() => handleGenerateBotTurn('You cannot cancel online. Per our terms, you must call our telephone customer care helpline between 10am-4pm.')}
+                onClick={() => {
+                  const text = 'You cannot cancel online. Per our terms, you must call our telephone customer care helpline between 10am-4pm.';
+                  setCustomMerchantInput(text);
+                  handleGenerateBotTurn(text);
+                }}
               >
                 2. Forced Phone Call Trap
               </button>
@@ -899,7 +917,11 @@ export default function LiveNegotiationConsole() {
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: 12 }}
-                onClick={() => handleGenerateBotTurn('We cannot process bank refunds, but we can offer you 200 reward wallet points or a ₹300 voucher.')}
+                onClick={() => {
+                  const text = 'We cannot process bank refunds, but we can offer you 200 reward wallet points or a ₹300 voucher.';
+                  setCustomMerchantInput(text);
+                  handleGenerateBotTurn(text);
+                }}
               >
                 3. Forced Credit / Coupon
               </button>
@@ -907,12 +929,46 @@ export default function LiveNegotiationConsole() {
                 type="button"
                 className="btn btn-outline btn-sm"
                 style={{ fontSize: 12 }}
-                onClick={() => handleGenerateBotTurn('The dispute window of 48 hours has expired. No further compensation can be provided.')}
+                onClick={() => {
+                  const text = 'The dispute window of 48 hours has expired. No further compensation can be provided.';
+                  setCustomMerchantInput(text);
+                  handleGenerateBotTurn(text);
+                }}
               >
                 4. Arbitrary Time Limit Window
               </button>
             </div>
           </div>
+
+          {/* Error Banner if any */}
+          {turnError && (
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#f87171',
+                fontSize: 13,
+                marginBottom: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertTriangle size={15} />
+                <span>{turnError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTurnError(null)}
+                style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: 13 }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Custom Input */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
@@ -933,13 +989,13 @@ export default function LiveNegotiationConsole() {
             <button
               className="btn btn-primary"
               onClick={() => handleGenerateBotTurn()}
-              disabled={isGeneratingTurn || !customMerchantInput.trim()}
-              style={{ minWidth: 160 }}
+              disabled={isGeneratingTurn}
+              style={{ minWidth: 180 }}
             >
               {isGeneratingTurn ? (
                 <>
                   <Zap size={14} className="animate-spin" />
-                  <span>Thinking (Local AI)...</span>
+                  <span>Thinking ({turnElapsedSec}s)...</span>
                 </>
               ) : (
                 <>
